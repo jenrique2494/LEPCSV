@@ -1,0 +1,1490 @@
+<article class="card">
+  <!-- Card Header: Word Display -->
+  <header class="card-header">
+    <h1 class="word">{{Word}}</h1>
+    <div class="badges-container">
+      <span class="pos-badge {{^Part of Speech}}is-empty{{/Part of Speech}}">
+        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}} 
+        {{^Part of Speech}}&nbsp;{{/Part of Speech}}
+      </span>
+      <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
+    </div>
+    <span class="audio-button word-audio-button"></span>
+    <span class="audio-button word-audio-button-anki"></span>
+    <button class="copy-card-button" title="Copiar texto de la tarjeta">
+    </button>
+  </header>
+
+  <!-- Pronunciation and Audio -->
+  <section class="pronunciation-audio">
+    <span class="pronunciation">/{{Pronunciation/IPA}}/</span>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- Example Sentences Section -->
+  <section class="examples-section">
+    <h2 class="section-title">Examples</h2>
+    <ul class="examples-list">
+      {{#Example 1}}
+      <li class="example-item">{{Example 1}}</li>
+      {{/Example 1}} {{#Example 2}}
+      <li class="example-item">{{Example 2}}</li>
+      {{/Example 2}} {{#Example 3}}
+      <li class="example-item">{{Example 3}}</li>
+      {{/Example 3}}
+    </ul>
+  </section>
+
+  <script>
+    (function() {
+      // Variables globales para manejar auto-reproducción
+      let front_pendingAutoplay = null;
+      let front_hasUserInteracted = false;
+      let front_hasAutoPlayed = false; // Flag to prevent multiple autoplay attempts
+
+      // Función para detectar primera interacción del usuario
+      function front_setupAutoplayOnFirstInteraction() {
+        const events = ['click', 'touchstart', 'keydown', 'mousemove'];
+        
+        const handleFirstInteraction = () => {
+          front_hasUserInteracted = true;
+          front_debugLog('👆 Primera interacción del usuario detectada', 'success');
+          
+          // Si hay un audio pendiente, reproducirlo ahora
+          if (front_pendingAutoplay && front_pendingAutoplay.audio) {
+            front_debugLog('🔄 Reproduciendo audio pendiente tras interacción del usuario');
+            front_pendingAutoplay.audio.play().then(() => {
+              front_debugLog('✅ Audio TikTok reproduciéndose tras interacción', 'success');
+            }).catch(error => {
+              front_debugLog(`❌ Error reproduciendo audio tras interacción: ${error.message}`, 'error');
+            });
+            front_pendingAutoplay = null;
+          }
+          
+          // Remover listeners ya que solo necesitamos la primera interacción
+          events.forEach(event => {
+            document.removeEventListener(event, handleFirstInteraction, true);
+          });
+        };
+        
+        // Agregar listeners para todos los tipos de interacción
+        events.forEach(event => {
+          document.addEventListener(event, handleFirstInteraction, true);
+        });
+        
+        front_debugLog('👂 Listeners de primera interacción configurados');
+      }
+
+      // Debug panel para monitorear el estado del audio
+      function front_createDebugPanel() {
+
+        // if (document.getElementById('audio-debug-panel')) {
+        //   return;
+        // }
+        
+        // const debugPanel = document.createElement('div');
+        // debugPanel.id = 'audio-debug-panel';
+        // debugPanel.style.cssText = `
+        //   position: fixed !important;
+        //   top: 10px !important;
+        //   right: 10px !important;
+        //   background: rgba(0,0,0,0.9) !important;
+        //   color: white !important;
+        //   padding: 10px !important;
+        //   border-radius: 5px !important;
+        //   font-family: monospace !important;
+        //   font-size: 12px !important;
+        //   max-width: 300px !important;
+        //   z-index: 99999 !important;
+        //   max-height: 400px !important;
+        //   overflow-y: auto !important;
+        //   border: 2px solid #00ff00 !important;
+        // `;
+        // debugPanel.innerHTML = `
+        //   <div style="font-weight: bold; margin-bottom: 5px; color: #00ff00;">🎵 Audio Debug Panel</div>
+        //   <div id="debug-content"></div>
+        //   <button onclick="clearDebugLog()" style="margin-top: 5px; padding: 2px 5px; background: #333; color: white; border: 1px solid #666;">Clear Log</button>
+        // `;
+        // document.body.appendChild(debugPanel);
+        
+        // // Log inmediato para confirmar que se creó
+        // setTimeout(() => {
+        //   debugLog('✅ Panel de debug creado y agregado al DOM', 'success');
+        // }, 100);
+      }
+
+      function front_debugLog(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const debugContent = document.getElementById('debug-content');
+        if (debugContent) {
+          const logEntry = document.createElement('div');
+          logEntry.style.cssText = `
+            margin: 2px 0;
+            padding: 2px;
+            border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
+            padding-left: 5px;
+          `;
+          logEntry.innerHTML = `<span style="color: gray;">[${timestamp}]</span> ${message}`;
+          debugContent.appendChild(logEntry);
+          debugContent.scrollTop = debugContent.scrollHeight;
+        }
+        console.log(`[Audio Debug] ${message}`);
+      }
+
+      function front_clearDebugLog() {
+        const debugContent = document.getElementById('debug-content');
+        if (debugContent) {
+          debugContent.innerHTML = '';
+        }
+      }
+
+      // Hacer la función global para que funcione desde el HTML
+      window.front_clearDebugLog = front_clearDebugLog;
+
+      function front_cleanExampleSentenceForCoca(sentenceHTML) {
+        if (typeof sentenceHTML !== "string" || !sentenceHTML) return "";
+
+        let cleaned = sentenceHTML;
+
+        cleaned = cleaned.replace(/\[.*?\]/g, "");
+
+        const equalsIndex = cleaned.indexOf("=");
+        if (equalsIndex !== -1) {
+          cleaned = cleaned.substring(0, equalsIndex);
+        }
+
+        cleaned = cleaned.replace(/\s+/g, " ");
+        return cleaned.trim();
+      }
+
+      // Function to set up copy card button functionality
+      function front_setupCopyCardButton() {
+        front_debugLog('🎯 Configurando botón de copiar texto de tarjeta');
+        
+        const copyButton = document.querySelector('.copy-card-button');
+        if (!copyButton) {
+          front_debugLog('❌ No se encontró el botón de copiar', 'error');
+          return;
+        }
+        
+        copyButton.addEventListener('click', async (e) => {
+          e.preventDefault();
+          front_debugLog('🖱️ Click en botón de copiar texto');
+          
+          try {
+            // Extract only the relevant text content (word, definition, examples)
+            const wordElement = document.querySelector('.word');
+            const exampleElements = document.querySelectorAll('.example-item');
+            
+            let textToCopy = '';
+            
+            // Add word
+            if (wordElement) {
+              const wordText = wordElement.textContent || wordElement.innerText || '';
+              if (wordText.trim()) {
+                textToCopy += `Word: ${wordText.trim()}\n\n`;
+              }
+            }
+            
+            // Add examples (front template shows examples only)
+            if (exampleElements.length > 0) {
+              textToCopy += 'Examples:\n';
+              exampleElements.forEach((element, index) => {
+                const exampleText = element.textContent || element.innerText || '';
+                if (exampleText.trim()) {
+                  // Clean up example text (remove extra whitespace, brackets, etc.)
+                  let cleanText = exampleText.trim();
+                  cleanText = cleanText.replace(/\[.*?\]/g, ''); // Remove bracketed content
+                  cleanText = cleanText.replace(/\s+/g, ' '); // Normalize whitespace
+                  cleanText = cleanText.trim();
+                  
+                  if (cleanText) {
+                    textToCopy += `${index + 1}. ${cleanText}\n`;
+                  }
+                }
+              });
+            }
+            
+            // Copy to clipboard
+            if (textToCopy.trim()) {
+              await navigator.clipboard.writeText(textToCopy.trim());
+              front_debugLog('✅ Texto copiado al portapapeles', 'success');
+              
+              // Visual feedback
+              const originalHTML = copyButton.innerHTML;
+              copyButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+              `;
+              copyButton.style.color = '#4CAF50';
+              
+              setTimeout(() => {
+                copyButton.innerHTML = originalHTML;
+                copyButton.style.color = '';
+              }, 1500);
+              
+            } else {
+              front_debugLog('⚠️ No hay texto relevante para copiar', 'warning');
+            }
+            
+          } catch (error) {
+            front_debugLog(`❌ Error copiando texto: ${error.message}`, 'error');
+            
+            // Visual feedback for error
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            `;
+            copyButton.style.color = '#f44336';
+            
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          }
+        });
+        
+        front_debugLog('✅ Botón de copiar configurado correctamente');
+      }
+
+      function front_highlightWordInExamples() {
+        const wordElement = document.querySelector(".word");
+        if (!wordElement) return;
+
+        const targetWord = wordElement.textContent || wordElement.innerText || "";
+        if (!targetWord) return;
+
+        const cleanWord = targetWord.toLowerCase().trim();
+        if (!cleanWord) return;
+
+        const generateVariations = (word) => {
+          const variations = new Set([word]);
+
+          // Basic plurals and verb forms
+          if (
+            word.endsWith("y") &&
+            word.length > 2 &&
+            !"aeiou".includes(word[word.length - 2])
+          ) {
+            variations.add(word.slice(0, -1) + "ies");
+            variations.add(word.slice(0, -1) + "ied");
+            variations.add(word.slice(0, -1) + "ying");
+            variations.add(word.slice(0, -1) + "er");
+            variations.add(word.slice(0, -1) + "est");
+            variations.add(word.slice(0, -1) + "ily");
+          } else if (
+            word.endsWith("s") ||
+            word.endsWith("sh") ||
+            word.endsWith("ch") ||
+            word.endsWith("x") ||
+            word.endsWith("z")
+          ) {
+            variations.add(word + "es");
+          } else {
+            variations.add(word + "s");
+          }
+
+          // Past tense, gerund, and comparative forms
+          if (word.endsWith("e")) {
+            variations.add(word + "d");
+            variations.add(word + "r");
+            variations.add(word + "rs");
+            variations.add(word + "st");
+            variations.add(word.slice(0, -1) + "ing");
+            variations.add(word.slice(0, -1) + "ely");
+            variations.add(word.slice(0, -1) + "ness");
+          } else {
+            variations.add(word + "ed");
+            variations.add(word + "er");
+            variations.add(word + "ers");
+            variations.add(word + "est");
+            variations.add(word + "ing");
+            variations.add(word + "ly");
+            variations.add(word + "ness");
+            variations.add(word + "ment");
+            variations.add(word + "ful");
+            variations.add(word + "less");
+
+            // Double consonant rules
+            if (
+              word.length >= 3 &&
+              !"aeiou".includes(word[word.length - 1]) &&
+              "aeiou".includes(word[word.length - 2]) &&
+              !"aeiouwxy".includes(word[word.length - 1])
+            ) {
+              const lastChar = word[word.length - 1];
+              variations.add(word + lastChar + "ing");
+              variations.add(word + lastChar + "ed");
+              variations.add(word + lastChar + "er");
+              variations.add(word + lastChar + "est");
+            }
+          }
+
+          // Adverb forms from adjectives
+          if (word.endsWith("ic")) {
+            variations.add(word + "ally");
+          } else if (word.endsWith("le")) {
+            variations.add(word.slice(0, -2) + "ly");
+          } else if (word.endsWith("ful")) {
+            variations.add(word + "ly");
+          } else if (word.endsWith("al")) {
+            variations.add(word + "ly");
+          }
+
+          // Negative prefixes
+          variations.add("un" + word);
+          variations.add("in" + word);
+          variations.add("im" + word);
+          variations.add("ir" + word);
+          variations.add("il" + word);
+          variations.add("dis" + word);
+          variations.add("mis" + word);
+          variations.add("non" + word);
+
+          // Additional verb forms
+          if (word.length > 3) {
+            // Third person singular present
+            if (word.endsWith("o") || word.endsWith("s") || word.endsWith("sh") || word.endsWith("ch") || word.endsWith("x") || word.endsWith("z")) {
+              variations.add(word + "es");
+            }
+            
+            // Past participle variations
+            if (word.endsWith("e")) {
+              variations.add(word + "n");
+            } else {
+              variations.add(word + "en");
+            }
+          }
+
+          // Noun forms
+          variations.add(word + "ion");
+          variations.add(word + "tion");
+          variations.add(word + "sion");
+          variations.add(word + "ation");
+          variations.add(word + "ness");
+          variations.add(word + "ity");
+          variations.add(word + "ability");
+          variations.add(word + "ment");
+          variations.add(word + "ance");
+          variations.add(word + "ence");
+
+          // Agent nouns
+          variations.add(word + "er");
+          variations.add(word + "or");
+          variations.add(word + "ist");
+          variations.add(word + "ian");
+
+          // Adjective forms
+          variations.add(word + "ive");
+          variations.add(word + "ous");
+          variations.add(word + "al");
+          variations.add(word + "ic");
+          variations.add(word + "able");
+          variations.add(word + "ible");
+
+          // Irregular forms handling (add common ones)
+          const irregularForms = {
+            be: ["am", "is", "are", "was", "were", "been", "being"],
+            have: ["has", "had", "having"],
+            do: ["does", "did", "done", "doing"],
+            go: ["goes", "went", "gone", "going"],
+            get: ["gets", "got", "gotten", "getting"],
+            make: ["makes", "made", "making"],
+            take: ["takes", "took", "taken", "taking"],
+            come: ["comes", "came", "coming"],
+            see: ["sees", "saw", "seen", "seeing"],
+            know: ["knows", "knew", "known", "knowing"],
+            think: ["thinks", "thought", "thinking"],
+            say: ["says", "said", "saying"],
+            tell: ["tells", "told", "telling"],
+            find: ["finds", "found", "finding"],
+            give: ["gives", "gave", "given", "giving"],
+            work: ["works", "worked", "working"],
+            call: ["calls", "called", "calling"],
+            try: ["tries", "tried", "trying"],
+            ask: ["asks", "asked", "asking"],
+            need: ["needs", "needed", "needing"],
+            feel: ["feels", "felt", "feeling"],
+            become: ["becomes", "became", "becoming"],
+            leave: ["leaves", "left", "leaving"],
+            put: ["puts", "putting"],
+            mean: ["means", "meant", "meaning"],
+            keep: ["keeps", "kept", "keeping"],
+            let: ["lets", "letting"],
+            begin: ["begins", "began", "begun", "beginning"],
+            seem: ["seems", "seemed", "seeming"],
+            help: ["helps", "helped", "helping"],
+            show: ["shows", "showed", "shown", "showing"],
+            hear: ["hears", "heard", "hearing"],
+            play: ["plays", "played", "playing"],
+            run: ["runs", "ran", "running"],
+            move: ["moves", "moved", "moving"],
+            live: ["lives", "lived", "living"],
+            believe: ["believes", "believed", "believing"],
+            hold: ["holds", "held", "holding"],
+            bring: ["brings", "brought", "bringing"],
+            happen: ["happens", "happened", "happening"],
+            write: ["writes", "wrote", "written", "writing"],
+            sit: ["sits", "sat", "sitting"],
+            stand: ["stands", "stood", "standing"],
+            lose: ["loses", "lost", "losing"],
+            pay: ["pays", "paid", "paying"],
+            meet: ["meets", "met", "meeting"],
+            include: ["includes", "included", "including"],
+            continue: ["continues", "continued", "continuing"],
+            set: ["sets", "setting"],
+            learn: ["learns", "learned", "learnt", "learning"],
+            change: ["changes", "changed", "changing"],
+            lead: ["leads", "led", "leading"],
+            understand: ["understands", "understood", "understanding"],
+            watch: ["watches", "watched", "watching"],
+            follow: ["follows", "followed", "following"],
+            stop: ["stops", "stopped", "stopping"],
+            create: ["creates", "created", "creating"],
+            speak: ["speaks", "spoke", "spoken", "speaking"],
+            read: ["reads", "reading"], // 'read' past tense is same spelling
+            spend: ["spends", "spent", "spending"],
+            grow: ["grows", "grew", "grown", "growing"],
+            open: ["opens", "opened", "opening"],
+            walk: ["walks", "walked", "walking"],
+            win: ["wins", "won", "winning"],
+            teach: ["teaches", "taught", "teaching"],
+            offer: ["offers", "offered", "offering"],
+            remember: ["remembers", "remembered", "remembering"],
+            consider: ["considers", "considered", "considering"],
+            appear: ["appears", "appeared", "appearing"],
+            buy: ["buys", "bought", "buying"],
+            serve: ["serves", "served", "serving"],
+            die: ["dies", "died", "dying"],
+            send: ["sends", "sent", "sending"],
+            build: ["builds", "built", "building"],
+            stay: ["stays", "stayed", "staying"],
+            fall: ["falls", "fell", "fallen", "falling"],
+            cut: ["cuts", "cutting"],
+            reach: ["reaches", "reached", "reaching"],
+            kill: ["kills", "killed", "killing"],
+            raise: ["raises", "raised", "raising"],
+            pass: ["passes", "passed", "passing"],
+            sell: ["sells", "sold", "selling"],
+            decide: ["decides", "decided", "deciding"],
+            return: ["returns", "returned", "returning"],
+            explain: ["explains", "explained", "explaining"],
+            hope: ["hopes", "hoped", "hoping"],
+            develop: ["develops", "developed", "developing"],
+            carry: ["carries", "carried", "carrying"],
+            break: ["breaks", "broke", "broken", "breaking"],
+            receive: ["receives", "received", "receiving"],
+            agree: ["agrees", "agreed", "agreeing"],
+            support: ["supports", "supported", "supporting"],
+            hit: ["hits", "hitting"],
+            produce: ["produces", "produced", "producing"],
+            eat: ["eats", "ate", "eaten", "eating"],
+            cover: ["covers", "covered", "covering"],
+            catch: ["catches", "caught", "catching"],
+            draw: ["draws", "drew", "drawn", "drawing"],
+            choose: ["chooses", "chose", "chosen", "choosing"],
+            cause: ["causes", "caused", "causing"],
+            point: ["points", "pointed", "pointing"],
+            plan: ["plans", "planned", "planning"],
+            expect: ["expects", "expected", "expecting"],
+            pick: ["picks", "picked", "picking"],
+            remain: ["remains", "remained", "remaining"],
+            suggest: ["suggests", "suggested", "suggesting"],
+            push: ["pushes", "pushed", "pushing"],
+            pull: ["pulls", "pulled", "pulling"],
+            drop: ["drops", "dropped", "dropping"],
+            count: ["counts", "counted", "counting"],
+            add: ["adds", "added", "adding"],
+            save: ["saves", "saved", "saving"],
+            join: ["joins", "joined", "joining"],
+            reduce: ["reduces", "reduced", "reducing"],
+            establish: ["establishes", "established", "establishing"],
+            remove: ["removes", "removed", "removing"],
+            close: ["closes", "closed", "closing"],
+            answer: ["answers", "answered", "answering"],
+            allow: ["allows", "allowed", "allowing"],
+            control: ["controls", "controlled", "controlling"],
+            rise: ["rises", "rose", "risen", "rising"],
+            result: ["results", "resulted", "resulting"],
+            apply: ["applies", "applied", "applying"],
+            end: ["ends", "ended", "ending"],
+            protect: ["protects", "protected", "protecting"],
+            require: ["requires", "required", "requiring"],
+            general: ["generally"],
+            public: ["publicly"],
+            social: ["socially"],
+            economic: ["economically"],
+            political: ["politically"],
+            international: ["internationally"],
+            national: ["nationally"],
+            local: ["locally"],
+            personal: ["personally"],
+            special: ["specially"],
+            medical: ["medically"],
+            legal: ["legally"],
+            financial: ["financially"],
+            physical: ["physically"],
+            natural: ["naturally"],
+            human: ["humanly"],
+            real: ["really"],
+            possible: ["possibly"],
+            available: ["availability"],
+            important: ["importantly"],
+            different: ["differently"],
+            small: ["smaller", "smallest"],
+            large: ["larger", "largest"],
+            great: ["greater", "greatest"],
+            high: ["higher", "highest"],
+            low: ["lower", "lowest"],
+            long: ["longer", "longest"],
+            short: ["shorter", "shortest"],
+            new: ["newer", "newest"],
+            old: ["older", "oldest"],
+            young: ["younger", "youngest"],
+            good: ["better", "best"],
+            bad: ["worse", "worst"],
+            big: ["bigger", "biggest"],
+            little: ["less", "least"],
+            many: ["more", "most"],
+            much: ["more", "most"],
+            few: ["fewer", "fewest"],
+            far: ["farther", "farthest", "further", "furthest"],
+          };
+
+          if (irregularForms[word]) {
+            irregularForms[word].forEach((form) => variations.add(form));
+          }
+
+          // Add capitalized versions
+          const originalVariations = Array.from(variations);
+          originalVariations.forEach((variant) => {
+            variations.add(variant.charAt(0).toUpperCase() + variant.slice(1));
+            variations.add(variant.toUpperCase());
+          });
+
+          return Array.from(variations);
+        };
+
+        const wordVariations = generateVariations(cleanWord);
+
+        // Create more flexible regex patterns
+        const exactPattern =
+          "\\b(" +
+          wordVariations
+            .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("|") +
+          ")\\b";
+        const exactRegex = new RegExp(exactPattern, "gi");
+
+        // Optional: Add pattern for partial matches within compound words
+        const partialPattern =
+          "(" +
+          wordVariations
+            .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("|") +
+          ")";
+        const partialRegex = new RegExp(partialPattern, "gi");
+
+        document.querySelectorAll(".example-item").forEach((item) => {
+          const originalHTML = item.innerHTML;
+
+          // Skip if already processed
+          if (item.querySelector("em")) {
+            // Preserve existing highlights and add new ones
+            const emTags = [];
+            let tempHTML = originalHTML.replace(
+              /<em[^>]*>.*?<\/em>/gi,
+              (match) => {
+                const placeholder = `__EM_PLACEHOLDER_${emTags.length}__`;
+                emTags.push(match);
+                return placeholder;
+              }
+            );
+
+            // Apply highlighting to non-highlighted text
+            tempHTML = tempHTML.replace(exactRegex, "<em>$1</em>");
+
+            // Restore original em tags
+            emTags.forEach((tag, index) => {
+              tempHTML = tempHTML.replace(`__EM_PLACEHOLDER_${index}__`, tag);
+            });
+
+            if (originalHTML !== tempHTML) {
+              item.innerHTML = tempHTML;
+            }
+          } else {
+            // Apply highlighting to fresh text
+            let highlightedHTML = originalHTML.replace(exactRegex, "<em>$1</em>");
+
+            // If no exact matches found, try partial matching for compound words
+            if (originalHTML === highlightedHTML) {
+              const textContent = item.textContent || item.innerText || "";
+              const words = textContent.toLowerCase().split(/\s+/);
+              const hasCompoundMatch = words.some((word) =>
+                wordVariations.some(
+                  (variant) =>
+                    word.includes(variant) &&
+                    word !== variant &&
+                    word.length > variant.length + 2
+                )
+              );
+
+              if (hasCompoundMatch) {
+                highlightedHTML = originalHTML.replace(
+                  partialRegex,
+                  "<em>$1</em>"
+                );
+              }
+            }
+
+            if (originalHTML !== highlightedHTML) {
+              item.innerHTML = highlightedHTML;
+            }
+          }
+        });
+      }
+
+      function front_processLevelBadge() {
+        const levelBadge = document.querySelector('.level-badge');
+        if (!levelBadge) return;
+        
+        const tagsContent = levelBadge.textContent || levelBadge.innerText || '';
+        if (!tagsContent) {
+          levelBadge.style.display = 'none';
+          return;
+        }
+        
+        // Extract all levels from tags (A1, A2, B1, B2, C1, C2, duplicate)
+        const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'duplicate'];
+        const foundLevels = levels.filter(level => 
+          tagsContent.toLowerCase().includes(level.toLowerCase())
+        );
+        
+        if (foundLevels.length === 0) {
+          levelBadge.style.display = 'none';
+          return;
+        }
+        
+        // Clear the original badge content
+        levelBadge.innerHTML = '';
+        
+        // Create individual badges for each found level
+        foundLevels.forEach((level, index) => {
+          const badge = document.createElement('span');
+          badge.textContent = level.toUpperCase();
+          badge.className = `level-badge level-${level.toLowerCase()}`;
+          
+          // Add some spacing between badges if there are multiple
+          if (index > 0) {
+            badge.style.marginLeft = '4px';
+          }
+          
+          levelBadge.appendChild(badge);
+        });
+        
+        // Remove the original level-badge class since we're using it as a container now
+        levelBadge.className = 'level-badges-container';
+      }
+
+      function front_applyCocaExampleCleaning() {
+        const exampleItems = document.querySelectorAll(
+          "article.card .examples-section .example-item"
+        );
+        exampleItems.forEach((item) => {
+          if (item.innerHTML) {
+            const originalHTML = item.innerHTML;
+            const cleanedHTML = front_cleanExampleSentenceForCoca(originalHTML);
+            if (originalHTML !== cleanedHTML) {
+              item.innerHTML = cleanedHTML;
+            }
+          }
+        });
+      }
+
+
+      // ===================================================================
+      // FUNCIÓN DE VERIFICACIÓN (TIMEOUT ACTUALIZADO A 700ms)
+      // ===================================================================
+
+      /**
+       * Realiza una serie de pruebas de red para determinar de forma fiable si el usuario está offline.
+       * Devuelve una promesa que se resuelve a `true` si está offline, o `false` si está online.
+       */
+      async function front_isReallyOffline() {
+          
+          // --- Función auxiliar para pruebas con "Image Ping" (evita CORS) ---
+          const imagePingTest = (url) => {
+              return () => new Promise((resolve, reject) => {
+                  const img = new Image();
+                  let timedOut = false;
+
+                  const timeout = setTimeout(() => {
+                      timedOut = true;
+                      img.onload = null;
+                      img.onerror = null;
+                      reject(new Error(`Timeout al cargar la imagen: ${url}`));
+                  }, 700); // <-- CAMBIO AQUÍ: Timeout de 0.7 segundos
+
+                  img.onload = () => {
+                      if (timedOut) return;
+                      clearTimeout(timeout);
+                      resolve(new Response(null, { status: 200 }));
+                  };
+
+                  img.onerror = () => {
+                      if (timedOut) return;
+                      clearTimeout(timeout);
+                      reject(new Error(`Error al cargar la imagen: ${url}`));
+                  };
+                  img.src = `${url}?_=${Date.now()}`;
+              });
+          };
+
+          // --- Array de todas las pruebas ---
+          const connectivityTests = [
+              imagePingTest('https://www.google.com/favicon.ico'),
+              imagePingTest('https://www.cloudflare.com/favicon.ico'),
+              () => fetch('https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js', {
+                  method: 'HEAD',
+                  cache: 'no-cache',
+                  signal: AbortSignal.timeout(700) // <-- CAMBIO AQUÍ: Timeout de 0.7 segundos
+              })
+          ];
+
+          // --- Lógica principal de la función ---
+          // Envolvemos Promise.any en otra promesa para controlar el valor de retorno
+          return new Promise(resolve => {
+              Promise.any(connectivityTests.map(test => test()))
+                  .then(() => {
+                      // Si CUALQUIER prueba tiene éxito, estamos online.
+                      resolve(false); // Resolvemos con `false` (no estamos offline)
+                  })
+                  .catch(() => {
+                      // Si TODAS las pruebas fallan, estamos offline.
+                      resolve(true); // Resolvemos con `true` (sí estamos offline)
+                  });
+          });
+      }
+      async function front_setWordTTS() {
+        front_debugLog('🎯 Iniciando configuración de TTS', 'info');
+
+        front_isReallyOffline().then(offline => {
+          // Este código dentro del .then() se ejecutará más tarde,
+          // cuando la comprobación termine (después de un máximo de 0.7 segundos).
+          // condicional para ver si ya audioButtonAnki ya tiene elementos adentro 
+          if (offline && audioButtonAnki.innerHTML.trim() === '') {
+              front_debugLog('🌐 Fetch remoto falló, sin conexión real', 'warning');
+              front_debugLog('🌐 Sin conexión: mostrando TTS nativo de Anki', 'success');
+              const voz='{tts en_US voices=Microsoft_Zira:Word}';
+              audioButtonAnki.innerHTML = `<span style="display:block">{{tts en_GB voices=com.google.android.tts-en-GB-language:Word}}</span>`;
+              
+
+              // El 'return' aquí solo saldría de la función .then(), no de la función principal.
+              // Si necesitas detener algo más, la lógica debería ir aquí dentro.
+          }else{
+              front_debugLog('🌐 Conexión verificada: procediendo con TTS remoto', 'success');
+          }
+        });
+       
+        const ttsConfig = {
+          domain: [
+            "https://anki-eng.0w0.live/",
+            "https://ms-ra-forwarder-for-ifreetime-v9q1.vercel.app/",
+          ],
+          params: {
+            speed: -4,
+          },
+        };
+
+        // Configuración alternativa de TikTok TTS
+        const tiktokTTSConfig = {
+          url: "https://tiktok-tts.weilnet.workers.dev/api/generation",
+          headers: {
+            'accept': '*/*',
+            'accept-language': 'en-US,en-GB;q=0.9,en;q=0.8',
+            'cache-control': 'no-cache',
+            'content-type': 'application/json',
+            'origin': 'https://free-tts.com',
+            'pragma': 'no-cache',
+            'referer': 'https://free-tts.com/',
+            'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+            'sec-ch-ua-mobile': '?0',
+            'sec-ch-ua-platform': '"Windows"',
+            'sec-fetch-dest': 'empty',
+            'sec-fetch-mode': 'cors',
+            'sec-fetch-site': 'cross-site',
+            'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+          }
+        };
+
+        // Lista completa de voces Azure
+        const voices = [
+          "en-US-AriaNeural",
+          "en-US-EmmaNeural",
+          "en-US-JennyNeural",
+          "en-US-ChristopherNeural",
+          "en-US-EricNeural",
+          "en-US-MichelleNeural",
+          "en-US-SteffanNeural",
+          "en-US-RogerNeural",
+          "en-GB-SoniaNeural",
+          "en-GB-LibbyNeural",
+          "en-GB-RyanNeural",
+          "en-GB-ThomasNeural",
+          "en-AU-NatashaNeural",
+          "en-AU-WilliamNeural",
+          "en-CA-ClaraNeural",
+          "en-CA-LiamNeural",
+          "en-IN-NeerjaNeural",
+          "en-IN-PrabhatNeural",
+          "en-IE-ConnorNeural",
+          "en-IE-EmilyNeural",
+        ];
+
+        // Voces de TikTok TTS como respaldo
+        const tiktokVoices = [
+          "en_us_001", // English US - Female 1
+          "en_us_002", // English US - Female 2
+          "en_us_006", // English US - Male 1
+          "en_us_007", // English US - Male 2
+          "en_us_009", // English US - Male 3
+          "en_us_010", // English US - Male 4
+          "en_uk_001", // English UK - Male 1
+          "en_uk_003", // English UK - Male 2
+          "en_au_001", // English AU - Female
+          "en_au_002", // English AU - Male
+          "en_male_narration", // Narrator
+          "en_female_emotional", // Peaceful
+          "en_male_cody", // Serious
+        ];
+        // Elegir 3 voces aleatorias distintas
+        function getRandomVoices(arr, n) {
+          const copy = arr.slice();
+          const result = [];
+          for (let i = 0; i < n && copy.length > 0; i++) {
+            const idx = Math.floor(Math.random() * copy.length);
+            result.push(copy.splice(idx, 1)[0]);
+          }
+          return result;
+        }
+
+        // Array that defines the order of TTS services to try
+        const ttsServiceOrder = ['streamelements', 'tiktok', 'azure'];
+        
+        // Set to track permanently failed TTS services
+        const failedServices = new Set();
+
+        // StreamElements TTS voices (using English voice names from voices.json)
+        const streamElementsVoices = [
+        // Polly US English voices
+        "Salli", "Matthew", "Kimberly", "Kendra", "Justin", "Joey", "Joanna", "Ivy",
+        // Polly British English voices  
+        "Emma", "Brian", "Amy",
+        // Polly Australian English voices
+        "Russell", "Nicole", 
+        // Polly Indian English voices
+        "Raveena", "Aditi",
+        // Polly Welsh English voice
+        "Geraint",
+        // Google US English voices
+        "en-US-Wavenet-A", "en-US-Wavenet-B", "en-US-Wavenet-C", "en-US-Wavenet-D", 
+        "en-US-Wavenet-E", "en-US-Wavenet-F", "en-US-Standard-B", "en-US-Standard-C", 
+        "en-US-Standard-D", "en-US-Standard-E",
+        // Google British English voices
+        "en-GB-Standard-A", "en-GB-Standard-B", "en-GB-Standard-C", "en-GB-Standard-D",
+        "en-GB-Wavenet-A", "en-GB-Wavenet-B", "en-GB-Wavenet-C", "en-GB-Wavenet-D",
+        // Google Australian English voices
+        "en-AU-Standard-A", "en-AU-Standard-B", "en-AU-Standard-C", "en-AU-Standard-D",
+        "en-AU-Wavenet-A", "en-AU-Wavenet-B", "en-AU-Wavenet-C", "en-AU-Wavenet-D",
+        // Google Indian English voices
+        "en-IN-Wavenet-A", "en-IN-Wavenet-B", "en-IN-Wavenet-C",
+        // Azure Canadian English voices
+        "Linda", "Heather",
+        // Azure Irish English voice
+        "Sean"
+      ];
+        
+        // Voice arrays for each service
+        const serviceVoices = {
+          streamelements: getRandomVoices(streamElementsVoices, 3),
+          azure: getRandomVoices(voices, 3),
+          tiktok: getRandomVoices(tiktokVoices, 3)
+        };
+        
+        let currentVoiceIdx = 0;
+
+        front_debugLog(`📝 TTS Service Order: ${ttsServiceOrder.join(' → ')}`);
+        front_debugLog(`📝 Voces StreamElements seleccionadas: ${serviceVoices.streamelements.join(', ')}`);
+        front_debugLog(`📝 Voces Azure seleccionadas: ${serviceVoices.azure.join(', ')}`);
+        front_debugLog(`📝 Voces TikTok seleccionadas: ${serviceVoices.tiktok.join(', ')}`);
+
+        const word = document.querySelector(".word")?.textContent?.trim();
+        const audioButton = document.querySelector(".word-audio-button");
+        const audioButtonAnki=document.querySelector(".word-audio-button-anki");
+        
+        if (!word) {
+          front_debugLog('❌ No se encontró la palabra en el elemento .word', 'error');
+          return;
+        }
+        if (!audioButton) {
+          front_debugLog('❌ No se encontró el botón de audio .word-audio-button', 'error');
+          return;
+        }
+        
+        front_debugLog(`🎯 Palabra encontrada: "${word}"`);
+        front_debugLog(`🎯 Botón de audio encontrado`);
+
+        // Helper function to get available services (not failed)
+        function getAvailableServices() {
+          return ttsServiceOrder.filter(service => !failedServices.has(service));
+        }
+
+        // Function to create StreamElements TTS audio
+        async function createStreamElementsAudio(text, voiceIndex) {
+          const voiceName = serviceVoices.streamelements[voiceIndex];
+          front_debugLog(`🟢 Intentando StreamElements TTS para "${text}" con voz: ${voiceName} (índice: ${voiceIndex})`);
+          
+          try {
+            const url = `https://api.streamelements.com/kappa/v2/speech?voice=${encodeURIComponent(voiceName)}&text=${encodeURIComponent(text)}`;
+            front_debugLog(`🔗 URL StreamElements: ${url}`);
+            
+            // Test the StreamElements API
+            const timeoutPromise = new Promise((_, reject) => {
+              setTimeout(() => reject(new Error('StreamElements timeout after 4 seconds')), 4000);
+            });
+            
+            const fetchPromise = fetch(url, {
+              method: 'HEAD',
+              cache: 'no-cache'
+            });
+            
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
+            front_debugLog(`📡 Respuesta StreamElements: ${response.status} ${response.statusText}`);
+            
+            if (response.ok && response.status === 200) {
+              const contentType = response.headers.get('content-type');
+              const contentLength = response.headers.get('content-length');
+              
+              front_debugLog(`📄 StreamElements Content-Type: ${contentType}, Content-Length: ${contentLength}`);
+              
+              // Check if it's actually audio content
+              if (contentType && 
+                  (contentType.includes('audio') || contentType.includes('mpeg') || contentType.includes('mp3'))) {
+                
+                front_debugLog(`✅ StreamElements TTS verificado como funcional`, 'success');
+                
+                // Create audio element
+                const audio = document.createElement("audio");
+                audio.preload = "auto";
+                audio.src = url;
+                
+                return audio;
+              } else {
+                throw new Error(`StreamElements invalid content: Type=${contentType}, Length=${contentLength}`);
+              }
+            } else {
+              throw new Error(`StreamElements HTTP error: ${response.status} ${response.statusText}`);
+            }
+          } catch (error) {
+            front_debugLog(`❌ Error StreamElements TTS: ${error.message}`, 'error');
+            throw error;
+          }
+        }
+
+        // Function to create Azure TTS audio
+        async function createAzureAudio(text, voiceIndex) {
+          const voiceName = serviceVoices.azure[voiceIndex];
+          front_debugLog(`🔵 Intentando Azure TTS para "${text}" con voz: ${voiceName} (índice: ${voiceIndex})`);
+          
+          const queryString = new URLSearchParams({
+            ...ttsConfig.params,
+            text: text,
+            voiceName,
+          });
+
+          // Test Azure endpoints to find working ones
+          for (const [index, url] of ttsConfig.domain.entries()) {
+            const fullUrl = `${url}api/aiyue?${queryString}`;
+            front_debugLog(`🔗 Probando Azure ${index + 1}: ${fullUrl}`);
+            
+            try {
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Azure TTS timeout after 2 seconds')), 2000);
+              });
+              
+              const fetchPromise = fetch(fullUrl, {
+                method: 'HEAD',
+                cache: 'no-cache',
+                headers: { 'Accept': 'audio/*' }
+              });
+              
+              const response = await Promise.race([fetchPromise, timeoutPromise]);
+              
+              if (response.ok && response.status === 200) {
+                const contentType = response.headers.get('content-type');
+                const contentLength = response.headers.get('content-length');
+                
+                if (contentType && 
+                    (contentType.includes('audio') || contentType.includes('mpeg') || contentType.includes('mp3')) &&
+                    contentLength && parseInt(contentLength) > 1000) {
+                  
+                  front_debugLog(`✅ Azure TTS ${index + 1} verificado como funcional`, 'success');
+                  
+                  // Create audio element with working sources
+                  const audio = document.createElement("audio");
+                  audio.preload = "none";
+                  
+                  ttsConfig.domain.forEach((sourceUrl, sourceIndex) => {
+                    const source = document.createElement("source");
+                    source.src = `${sourceUrl}api/aiyue?${queryString}`;
+                    source.type = "audio/mpeg";
+                    audio.appendChild(source);
+                  });
+                  
+                  return audio;
+                }
+              }
+            } catch (error) {
+              front_debugLog(`❌ Azure ${index + 1} failed: ${error.message}`, 'error');
+            }
+          }
+          
+          throw new Error('All Azure TTS sources failed');
+        }
+
+        // Function to create TikTok TTS audio  
+        async function createTiktokAudioElement(text, voiceIndex) {
+          const voiceCode = serviceVoices.tiktok[voiceIndex];
+          front_debugLog(`🟡 Intentando TikTok TTS para "${text}" con voz: ${voiceCode} (índice: ${voiceIndex})`);
+          
+          const audioUrl = await createTiktokAudio(text, voiceCode);
+          
+          const audio = document.createElement("audio");
+          audio.preload = "none";
+          audio.src = audioUrl;
+          
+          return audio;
+        }
+        async function createTiktokAudio(text, voiceCode) {
+          front_debugLog(`🚀 Iniciando TikTok TTS para "${text}" con voz: ${voiceCode}`);
+          try {
+            const response = await fetch(tiktokTTSConfig.url, {
+              method: 'POST',
+              headers: tiktokTTSConfig.headers,
+              body: JSON.stringify({
+                text: text,
+                voice: voiceCode
+              })
+            });
+
+            front_debugLog(`📡 Respuesta TikTok TTS: ${response.status} ${response.statusText}`);
+
+            if (!response.ok) {
+              throw new Error(`TikTok TTS failed: ${response.status}`);
+            }
+
+            const responseData = await response.json();
+            front_debugLog(`📦 Datos de respuesta TikTok TTS recibidos`);
+            front_debugLog(`✅ Success: ${responseData.success}, Error: ${responseData.error || 'none'}`);
+            
+            // Verificar si la respuesta fue exitosa
+            if (responseData.success && responseData.data) {
+              // La respuesta viene directamente en el campo 'data' como base64
+              const audioBase64 = responseData.data;
+              front_debugLog(`📊 Tamaño del audio base64: ${audioBase64.length} caracteres`);
+              
+              // Convertir base64 a blob
+              const binaryString = atob(audioBase64);
+              const bytes = new Uint8Array(binaryString.length);
+              for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+              }
+              
+              const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
+              const audioUrl = URL.createObjectURL(audioBlob);
+              
+              front_debugLog(`✅ TikTok TTS audio creado exitosamente con voz: ${voiceCode}`, 'success');
+              front_debugLog(`🔗 URL del audio: ${audioUrl.substring(0, 50)}...`);
+              return audioUrl;
+            } else {
+              throw new Error(`TikTok TTS API error: ${responseData.error || 'Unknown error'}`);
+            }
+          } catch (error) {
+            front_debugLog(`❌ Error en TikTok TTS: ${error.message}`, 'error');
+            throw error;
+          }
+        }
+        // Botón de audio
+        front_debugLog('🔧 Creando botón de audio');
+        audioButton.innerHTML = "";
+        audioButton.insertAdjacentHTML(
+          "beforeend",
+          '<a class="tts-button audio-button soundLink"><svg viewBox="0 0 24 24"><path d="M5.25 9v6h4l5 5V4L9.25 9H5.25z M18.75 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg></a>'
+        );
+        const ttsBtn = audioButton.querySelector(".tts-button");
+        front_debugLog('✅ Botón de audio creado');
+        
+        // Add double-click event to the word element to trigger audio playback
+        // Use a more targeted approach to prevent listener accumulation
+        const wordElement = document.querySelector('.card');
+        if (wordElement && ttsBtn) {
+          // Create a unique handler for this specific TTS button instance
+          const cardInstanceId = 'card-instance-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+          
+          // Store reference to this specific button in a data attribute
+          ttsBtn.setAttribute('data-instance-id', cardInstanceId);
+          
+          const handleDoubleClick = function(e) {
+            // Find the TTS button that belongs to this card
+            const targetTtsBtn = e.currentTarget.querySelector('.word-audio-button .tts-button');
+            
+            // Only proceed if we found a button and it's still the current instance
+            if (targetTtsBtn && targetTtsBtn.getAttribute('data-instance-id')) {
+              front_debugLog('🖱️ Doble click en la tarjeta, reproduciendo audio de instancia actual');
+              targetTtsBtn.click();
+            } else {
+              front_debugLog('⚠️ Doble click detectado pero no hay botón TTS válido');
+            }
+          };
+          
+          // Remove any previous listeners of this type using a custom event namespace
+          if (wordElement._doubleClickHandler) {
+            wordElement.removeEventListener('dblclick', wordElement._doubleClickHandler);
+            front_debugLog('🧹 Removido listener anterior');
+          }
+          
+          // Store the handler reference for future cleanup
+          wordElement._doubleClickHandler = handleDoubleClick;
+          wordElement.addEventListener('dblclick', handleDoubleClick);
+          
+          front_debugLog(`✅ Listener de doble click configurado para instancia ${cardInstanceId}`);
+        }
+
+        // Main function to create TTS audio using service order
+        async function createCurrentVoiceAudio() {
+          front_debugLog('🎵 Iniciando creación de audio con service order');
+          
+          // Pause and completely stop ALL existing audios
+          const existingAudios = document.querySelectorAll("article.card audio");
+          front_debugLog(`⏸️ Pausando y reseteando ${existingAudios.length} audios existentes`);
+          existingAudios.forEach((a) => {
+            a.pause();
+            a.currentTime = 0;
+            // Clear any pending operations
+            a.load();
+          });
+          
+          // Wait a bit to ensure all audios are fully stopped
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Remove previous audio if exists
+          const prevAudio = audioButton.querySelector("audio");
+          if (prevAudio) {
+            front_debugLog('🗑️ Eliminando audio anterior');
+            prevAudio.pause();
+            prevAudio.currentTime = 0;
+            prevAudio.remove();
+          }
+
+          const availableServices = getAvailableServices();
+          if (availableServices.length === 0) {
+            front_debugLog('❌ No hay servicios TTS disponibles', 'error');
+            return;
+          }
+
+          front_debugLog(`🔄 Servicios disponibles: ${availableServices.join(', ')}`);
+
+          // Try each service in order
+          for (const service of availableServices) {
+            try {
+              front_debugLog(`� Intentando servicio: ${service}`);
+              let audio;
+
+              if (service === 'streamelements') {
+                audio = await createStreamElementsAudio(word, currentVoiceIdx);
+              } else if (service === 'tiktok') {
+                audio = await createTiktokAudioElement(word, currentVoiceIdx);
+              } else if (service === 'azure') {
+                audio = await createAzureAudio(word, currentVoiceIdx);
+              } else {
+                front_debugLog(`❌ Servicio desconocido: ${service}`, 'error');
+                continue;
+              }
+
+              // Add event listeners for monitoring
+              audio.addEventListener('error', (e) => {
+                front_debugLog(`❌ Error ${service} durante reproducción: ${e.type}`, 'error');
+              });
+              
+              audio.addEventListener('loadstart', () => {
+                front_debugLog(`📡 ${service} audio: loadstart detectado`);
+              });
+              
+              audio.addEventListener('canplaythrough', () => {
+                front_debugLog(`✅ ${service} audio: canplaythrough - listo para reproducir`, 'success');
+              });
+
+              audioButton.insertBefore(audio, ttsBtn);
+              front_debugLog(`📽️ Audio ${service} insertado en el DOM`, 'success');
+
+              // Auto-play for first load only - but let playAllAudiosSequentially handle it
+              if (currentVoiceIdx === 0 && !front_hasAutoPlayed) {
+                front_debugLog(`🔄 Audio ${service} preparado para auto-reproducción secuencial (carga inicial)`);
+                
+                // Don't play here - let playAllAudiosSequentially handle the initial playback
+                // Just ensure the audio is ready
+                const ensureReady = async () => {
+                  if (audio.readyState >= 2) { // HAVE_CURRENT_DATA
+                    front_debugLog(`✅ Audio ${service} listo para reproducción secuencial`, 'success');
+                  } else {
+                    front_debugLog(`⏳ Audio ${service} preparándose para reproducción secuencial...`);
+                    setTimeout(ensureReady, 100);
+                  }
+                };
+                
+                setTimeout(ensureReady, 100);
+              }
+
+              return; // Success, exit the loop
+            } catch (error) {
+              front_debugLog(`❌ Error con servicio ${service}: ${error.message}`, 'error');
+              front_debugLog(`🚫 Marcando ${service} como fallido permanentemente`);
+              failedServices.add(service);
+            }
+          }
+
+          // If all services failed
+          front_debugLog('❌ Todos los servicios TTS fallaron', 'error');
+          const silentAudio = document.createElement("audio");
+          silentAudio.preload = "none";
+          audioButton.insertBefore(silentAudio, ttsBtn);
+          front_debugLog('🔇 Audio silencioso creado como último recurso', 'warning');
+        }
+        front_debugLog('🎯 Creando audio inicial');
+        await createCurrentVoiceAudio(); // Wait for audio creation to complete
+        
+        ttsBtn.addEventListener("click", async (e) => {
+          e.preventDefault();
+          front_debugLog('🖱️ Click en botón de audio');
+          
+          // First, immediately stop ALL audios to prevent conflicts
+          document.querySelectorAll("article.card audio").forEach((a) => {
+            a.pause();
+            a.currentTime = 0;
+          });
+          
+          // Get current service being used (first available service)
+          const availableServices = getAvailableServices();
+          if (availableServices.length === 0) {
+            front_debugLog('❌ No hay servicios disponibles para cambiar voz', 'error');
+            return;
+          }
+          
+          const currentService = availableServices[0]; // We use the first available service
+          const currentVoices = serviceVoices[currentService];
+          
+          // Change to next voice index
+          const oldVoiceIdx = currentVoiceIdx;
+          currentVoiceIdx = (currentVoiceIdx + 1) % currentVoices.length;
+          front_debugLog(`🔄 Cambiando voz ${currentService}: ${currentVoices[oldVoiceIdx]} → ${currentVoices[currentVoiceIdx]}`);
+          
+          const prevAudio = audioButton.querySelector("audio");
+          if (prevAudio) {
+            front_debugLog('🗑️ Removiendo audio anterior del click');
+            prevAudio.pause();
+            prevAudio.currentTime = 0;
+            prevAudio.remove();
+          }
+          
+          // Wait a moment to ensure cleanup is complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          await createCurrentVoiceAudio();
+          
+          const audio = audioButton.querySelector("audio");
+          if (audio) {
+            front_debugLog('▶️ Intentando reproducir audio');
+            
+            // Double-check that all other audios are stopped
+            document
+              .querySelectorAll("article.card audio")
+              .forEach((a) => {
+                if (a !== audio) {
+                  a.pause();
+                  a.currentTime = 0;
+                }
+              });
+            
+            // Ensure current audio starts from beginning
+            audio.currentTime = 0;
+            
+            try {
+              await audio.play();
+              front_debugLog('✅ Audio reproduciéndose correctamente', 'success');
+            } catch (playError) {
+              front_debugLog(`❌ Error al reproducir audio: ${playError.message}`, 'error');
+            }
+          } else {
+            front_debugLog('❌ No se encontró elemento de audio para reproducir', 'error');
+          }
+        });
+        
+        front_debugLog('✅ Configuración de TTS completada', 'success');
+      }
+
+      function front_playAllAudiosSequentially() {
+        front_debugLog('🎵 Iniciando playAllAudiosSequentially');
+        
+        // Check if we're already in an autoplay sequence to prevent double execution
+        if (window.sequenceInProgress) {
+          front_debugLog('⚠️ Secuencia ya en progreso, saltando duplicado');
+          return;
+        }
+        window.sequenceInProgress = true;
+        
+        // Pause and reset ALL audios first to prevent conflicts
+        document.querySelectorAll("article.card audio").forEach((a) => {
+          a.pause();
+          a.currentTime = 0;
+        });
+        
+        // Get audios directly (don't clone to preserve src)
+        const audios = [];
+        const wordAudio = document.querySelector(".word-audio-button audio");
+        if (wordAudio) {
+          audios.push({ element: wordAudio, type: 'word' });
+          front_debugLog(`🎵 Audio de palabra encontrado: ${wordAudio.src ? 'con src' : 'sin src'}`);
+          front_debugLog(`🔗 Audio src: ${wordAudio.src ? wordAudio.src.substring(0, 50) + '...' : 'NO SRC'}`);
+        }
+        
+        if (audios.length === 0) {
+          front_debugLog('⚠️ No se encontraron audios para reproducir en secuencia');
+          window.sequenceInProgress = false;
+          return;
+        }
+        
+        front_debugLog(`🎵 Iniciando reproducción secuencial de ${audios.length} audios`);
+        let currentIndex = 0;
+        let isSequencePlaying = false;
+        
+        const playNext = async () => {
+          if (currentIndex >= audios.length || isSequencePlaying) {
+            if (currentIndex >= audios.length) {
+              front_debugLog('✅ Reproducción secuencial completada');
+              window.sequenceInProgress = false;
+            }
+            return;
+          }
+          
+          isSequencePlaying = true;
+          const audioData = audios[currentIndex];
+          const currentAudio = audioData.element;
+          
+          front_debugLog(`🎵 Reproduciendo audio ${currentIndex + 1}/${audios.length} (${audioData.type})`);
+          
+          // Ensure all other audios are completely stopped
+          audios.forEach((otherAudioData, otherIndex) => {
+            if (otherIndex !== currentIndex) {
+              const otherAudio = otherAudioData.element;
+              if (!otherAudio.paused) {
+                otherAudio.pause();
+                otherAudio.currentTime = 0;
+              }
+            }
+          });
+          
+          // Wait for audio to be ready
+          const waitForReady = () => Promise.resolve();
+          
+          try {
+            await waitForReady();
+            
+            // Ensure audio starts from beginning
+            currentAudio.currentTime = 0;
+            
+            // Set up end listener before playing
+            const onAudioEnded = () => {
+              currentAudio.removeEventListener('ended', onAudioEnded);
+              front_debugLog(`✅ Audio ${currentIndex + 1} (${audioData.type}) terminó`);
+              
+              isSequencePlaying = false;
+              currentIndex++;
+              
+              // Delay before next audio to prevent overlap
+              setTimeout(playNext, 300);
+            };
+            
+            currentAudio.addEventListener('ended', onAudioEnded);
+            
+            // Try to play
+            await currentAudio.play();
+            front_debugLog(`✅ Audio ${currentIndex + 1} (${audioData.type}) reproduciéndose`);
+            
+            // Mark autoplay as successful only after successful play
+            if (currentIndex === 0 && !front_hasAutoPlayed) {
+              front_hasAutoPlayed = true;
+              front_debugLog(`🎯 Auto-play exitoso - marcando hasAutoPlayed = true`, 'success');
+            }
+            
+          } catch (error) {
+            front_debugLog(`⚠️ Error reproduciendo audio ${currentIndex + 1}: ${error.message}`, 'warning');
+            
+            // Si es un error de auto-reproducción y no hemos interactuado, guardar para después
+            if (error.message.includes('user didn\'t interact') && !front_hasUserInteracted) {
+              front_debugLog(`💾 Guardando audio ${currentIndex + 1} para reproducir tras interacción`);
+              front_pendingAutoplay = { audio: currentAudio };
+              front_setupAutoplayOnFirstInteraction();
+              isSequencePlaying = false;
+              window.sequenceInProgress = false;
+              return; // Stop the sequence
+            }
+            
+            // Continue with next audio if this one failed
+            isSequencePlaying = false;
+            currentIndex++;
+            setTimeout(playNext, 100);
+          }
+        };
+        
+        // Start playback after ensuring all setup is complete
+        setTimeout(playNext, 400);
+      }
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", async function () {
+          front_createDebugPanel();
+          front_debugLog('🚀 DOM Content Loaded - Iniciando aplicación');
+          front_setupAutoplayOnFirstInteraction(); // Configurar auto-reproducción
+          front_setupCopyCardButton(); // Setup copy button
+          front_processLevelBadge();
+          front_applyCocaExampleCleaning();
+          front_highlightWordInExamples();
+          await front_setWordTTS(); // Wait for TTS setup to complete
+          setTimeout(() => {
+            front_debugLog('🎵 Ejecutando playAllAudiosSequentially');
+            front_playAllAudiosSequentially();
+          }, 100); // Reduced delay since audio is already ready
+        });
+      } else {
+        (async () => {
+          front_createDebugPanel();
+          front_debugLog('🚀 DOM ya cargado - Iniciando aplicación');
+          front_setupAutoplayOnFirstInteraction(); // Configurar auto-reproducción
+          front_setupCopyCardButton(); // Setup copy button
+          front_processLevelBadge();
+          front_applyCocaExampleCleaning();
+          front_highlightWordInExamples();
+          await front_setWordTTS(); // Wait for TTS setup to complete
+          setTimeout(() => {
+            front_debugLog('🎵 Ejecutando playAllAudiosSequentially');
+            front_playAllAudiosSequentially();
+          }, 100); // Reduced delay since audio is already ready
+        })();
+      }
+    })();
+  </script>
+</article>

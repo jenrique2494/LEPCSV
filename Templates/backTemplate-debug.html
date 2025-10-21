@@ -1,0 +1,1370 @@
+<article class="card">
+    <!-- Card Header: Word + Part of Speech -->
+    <header class="card-header">
+      <h1 class="word">{{Word}}</h1>
+      <div class="badges-container">
+        <span class="pos-badge {{^Part of Speech}}is-empty{{/Part of Speech}}">
+          {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}}
+          {{^Part of Speech}}&nbsp;{{/Part of Speech}}
+        </span>
+        <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
+      </div>
+      <span class="audio-button word-audio-button"></span>
+    </header>
+  
+    <!-- Pronunciation and Audio -->
+    <section class="pronunciation-audio">
+      <span class="pronunciation">/{{Pronunciation/IPA}}/</span>
+    </section>
+  
+    <!-- Grammar Information (if it exists) -->
+    {{#Grammar}}
+    <div class="grammar">{{Grammar}}</div>
+    {{/Grammar}}
+  
+    <hr class="divider">
+  
+    <!-- Definition Section -->
+    <section class="definition-section">
+      <h2 class="section-title">Definition</h2>
+      <div class="definition-content">{{Definition}}</div>
+      <span class="audio-button definition-audio-button"></span>
+    </section>
+  
+    <hr class="divider">
+  
+    <!-- Example Sentences Section -->
+    <section class="examples-section">
+      <h2 class="section-title">Examples</h2>
+      <ul class="examples-list">
+        {{#Example 1}}
+        <li class="example-sentence">
+          <span class="example-item">{{Example 1}}</span>
+          <div class="example-audio"></div>
+        </li>
+        {{/Example 1}}
+        {{#Example 2}}
+        <li class="example-sentence">
+          <span class="example-item">{{Example 2}}</span>
+          <div class="example-audio"></div>
+        </li>
+        {{/Example 2}}
+        {{#Example 3}}
+        <li class="example-sentence">
+          <span class="example-item">{{Example 3}}</span>
+          <div class="example-audio"></div>
+        </li>
+        {{/Example 3}}
+      </ul>
+    </section>
+  </article>
+
+  <script>
+    // Debug panel functions (global scope)
+    function debugLog(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      
+      // Try static debug panel first
+      const debugLogElement = document.getElementById('debugLog');
+      if (debugLogElement) {
+        const logEntry = document.createElement('div');
+        logEntry.style.cssText = `
+          margin: 2px 0;
+          padding: 2px;
+          border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
+          padding-left: 5px;
+        `;
+        logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
+        debugLogElement.appendChild(logEntry);
+        debugLogElement.scrollTop = debugLogElement.scrollHeight;
+      }
+      
+      // Also try dynamic debug panel
+      const debugContent = document.getElementById('debug-content');
+      if (debugContent) {
+        const logEntry = document.createElement('div');
+        logEntry.style.cssText = `
+          margin: 2px 0;
+          padding: 2px;
+          border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
+          padding-left: 5px;
+        `;
+        logEntry.innerHTML = `<span style="color: gray;">[${timestamp}]</span> ${message}`;
+        debugContent.appendChild(logEntry);
+        debugContent.scrollTop = debugContent.scrollHeight;
+      }
+      
+      console.log(`[Audio Debug] ${message}`);
+    }
+
+    function clearDebugLog() {
+      const debugLogElement = document.getElementById('debugLog');
+      if (debugLogElement) {
+        debugLogElement.innerHTML = '';
+      }
+      const debugContent = document.getElementById('debug-content');
+      if (debugContent) {
+        debugContent.innerHTML = '';
+      }
+    }
+
+    // Make clearDebugLog global so it can be accessed from HTML
+    window.clearDebugLog = clearDebugLog;
+
+    // TikTok TTS voice codes for fallback (same as front template)
+    const tiktokVoices = [
+      "en_us_001", // English US - Female 1
+      "en_us_002", // English US - Female 2
+      "en_us_006", // English US - Male 1
+      "en_us_007", // English US - Male 2
+      "en_us_009", // English US - Male 3
+      "en_us_010", // English US - Male 4
+      "en_uk_001", // English UK - Male 1
+      "en_uk_003", // English UK - Male 2
+      "en_au_001", // English AU - Female
+      "en_au_002", // English AU - Male
+      "en_male_narration", // Narrator
+      "en_female_emotional", // Peaceful
+      "en_male_cody", // Serious
+    ];
+
+    // Variables globales para manejar auto-reproducción
+    let pendingAutoplay = null;
+    let hasUserInteracted = false;
+    
+    // Variable global para fallback permanente a TikTok
+    let globalTiktokFallback = false;
+
+    // Función para detectar primera interacción del usuario
+    function setupAutoplayOnFirstInteraction() {
+      const events = ['click', 'touchstart', 'keydown', 'mousemove'];
+      
+      const handleFirstInteraction = () => {
+        hasUserInteracted = true;
+        debugLog('👆 Primera interacción del usuario detectada', 'success');
+        
+        // Si hay un audio pendiente, reproducirlo ahora
+        if (pendingAutoplay && pendingAutoplay.audio) {
+          debugLog('🔄 Reproduciendo audio pendiente tras interacción del usuario');
+          pendingAutoplay.audio.play().then(() => {
+            debugLog('✅ Audio TikTok reproduciéndose tras interacción', 'success');
+          }).catch(error => {
+            debugLog(`❌ Error reproduciendo audio tras interacción: ${error.message}`, 'error');
+          });
+          pendingAutoplay = null;
+        }
+        
+        // Remover listeners ya que solo necesitamos la primera interacción
+        events.forEach(event => {
+          document.removeEventListener(event, handleFirstInteraction, true);
+        });
+      };
+      
+      // Agregar listeners para todos los tipos de interacción
+      events.forEach(event => {
+        document.addEventListener(event, handleFirstInteraction, true);
+      });
+      
+      debugLog('👂 Listeners de primera interacción configurados');
+    }
+
+    // Debug panel para monitorear el estado del audio
+    function createDebugPanel() {
+      // Verificar si ya existe el panel
+      if (document.getElementById('audio-debug-panel')) {
+        return;
+      }
+      
+      const debugPanel = document.createElement('div');
+      debugPanel.id = 'audio-debug-panel';
+      debugPanel.style.cssText = `
+        position: fixed !important;
+        top: 10px !important;
+        right: 10px !important;
+        background: rgba(0,0,0,0.9) !important;
+        color: white !important;
+        padding: 10px !important;
+        border-radius: 5px !important;
+        font-family: monospace !important;
+        font-size: 12px !important;
+        max-width: 300px !important;
+        z-index: 99999 !important;
+        max-height: 400px !important;
+        overflow-y: auto !important;
+        border: 2px solid #00ff00 !important;
+      `;
+      debugPanel.innerHTML = `
+        <div style="font-weight: bold; margin-bottom: 5px; color: #00ff00;">🎵 Audio Debug Panel</div>
+        <div id="debug-content"></div>
+        <button onclick="clearDebugLog()" style="margin-top: 5px; padding: 2px 5px; background: #333; color: white; border: 1px solid #666;">Clear Log</button>
+      `;
+      document.body.appendChild(debugPanel);
+      
+      // Log inmediato para confirmar que se creó
+      setTimeout(() => {
+        debugLog('✅ Panel de debug creado y agregado al DOM', 'success');
+      }, 100);
+    }
+
+    const ttsConfig = {
+        domain: [
+          'https://anki-eng.0w0.live/', 
+          'https://ms-ra-forwarder-for-ifreetime-v9q1.vercel.app/',
+        ],
+        params: {
+          speed: -4,
+        }
+      };
+    const voices = [
+        'en-US-AriaNeural',
+        'en-US-EmmaNeural',
+        'en-US-JennyNeural',
+        'en-US-ChristopherNeural',
+        'en-US-EricNeural',
+        'en-US-MichelleNeural',
+        'en-US-SteffanNeural',
+        'en-US-RogerNeural',
+        'en-GB-SoniaNeural',
+        'en-GB-LibbyNeural',
+        'en-GB-RyanNeural',
+        'en-GB-ThomasNeural',
+        'en-AU-NatashaNeural',
+        'en-AU-WilliamNeural',
+        'en-CA-ClaraNeural',
+        'en-CA-LiamNeural',
+        'en-IN-NeerjaNeural',
+        'en-IN-PrabhatNeural',
+        'en-IE-ConnorNeural',
+        'en-IE-EmilyNeural',
+      ];
+    function getRandomVoices(arr, n) {
+        const copy = arr.slice();
+        const result = [];
+        for (let i = 0; i < n && copy.length > 0; i++) {
+          const idx = Math.floor(Math.random() * copy.length);
+          result.push(copy.splice(idx, 1)[0]);
+        }
+        return result;
+      }
+
+    // TikTok TTS configuration
+    const tiktokTTSConfig = {
+      url: "https://tiktok-tts.weilnet.workers.dev/api/generation",
+      headers: {
+        'accept': '*/*',
+        'accept-language': 'en-US,en-GB;q=0.9,en;q=0.8',
+        'cache-control': 'no-cache',
+        'content-type': 'application/json',
+        'origin': 'https://free-tts.com',
+        'pragma': 'no-cache',
+        'referer': 'https://free-tts.com/',
+        'sec-ch-ua': '"Not;A=Brand";v="99", "Google Chrome";v="139", "Chromium";v="139"',
+        'sec-ch-ua-mobile': '?0',
+        'sec-ch-ua-platform': '"Windows"',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-mode': 'cors',
+        'sec-fetch-site': 'cross-site',
+        'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36'
+      }
+    };
+
+    // Function to create TikTok TTS audio
+    async function createTiktokAudio(text, voiceCode) {
+      debugLog(`🚀 Iniciando TikTok TTS para "${text}" con voz: ${voiceCode}`);
+      try {
+        const response = await fetch(tiktokTTSConfig.url, {
+          method: 'POST',
+          headers: tiktokTTSConfig.headers,
+          body: JSON.stringify({
+            text: text,
+            voice: voiceCode
+          })
+        });
+
+        debugLog(`📡 Respuesta TikTok TTS: ${response.status} ${response.statusText}`);
+
+        if (!response.ok) {
+          throw new Error(`TikTok TTS failed: ${response.status}`);
+        }
+
+        const responseData = await response.json();
+        debugLog(`📦 Datos de respuesta TikTok TTS recibidos`);
+        debugLog(`✅ Success: ${responseData.success}, Error: ${responseData.error || 'none'}`);
+        
+        if (responseData.success && responseData.data) {
+          const audioBase64 = responseData.data;
+          debugLog(`📊 Tamaño del audio base64: ${audioBase64.length} caracteres`);
+          
+          const binaryString = atob(audioBase64);
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          
+          const audioBlob = new Blob([bytes], { type: 'audio/mpeg' });
+          const audioUrl = URL.createObjectURL(audioBlob);
+          
+          debugLog(`✅ TikTok TTS audio creado exitosamente con voz: ${voiceCode}`, 'success');
+          debugLog(`🔗 URL del audio: ${audioUrl.substring(0, 50)}...`);
+          return audioUrl;
+        } else {
+          throw new Error(`TikTok TTS API error: ${responseData.error || 'Unknown error'}`);
+        }
+      } catch (error) {
+        debugLog(`❌ Error en TikTok TTS: ${error.message}`, 'error');
+        throw error;
+      }
+    }
+
+    // Enhanced TTS creation and playback with robust fallback
+    async function createAndPlayTTS(text, container, selectedVoices, currentVoiceIdx, isUsingTiktokFallback = false, selectedTiktokVoices = []) {
+      debugLog(`🎵 Iniciando creación de audio para: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+      
+      // Check global fallback first
+      if (globalTiktokFallback) {
+        isUsingTiktokFallback = true;
+        debugLog('🌐 Usando TikTok fallback global - Azure previamente falló', 'warning');
+      }
+      
+      // Pause other audios
+      const existingAudios = document.querySelectorAll("article.card audio");
+      debugLog(`⏸️ Pausando ${existingAudios.length} audios existentes`);
+      existingAudios.forEach((a) => !a.paused && a.pause());
+      
+      // Remove previous audio
+      const prevAudio = container.querySelector("audio");
+      if (prevAudio) {
+        debugLog('🗑️ Eliminando audio anterior');
+        prevAudio.remove();
+      }
+
+      const audio = document.createElement("audio");
+      audio.preload = "none";
+
+      try {
+        if (!isUsingTiktokFallback) {
+          debugLog('🔵 Intentando con Azure TTS primero');
+          const voiceName = selectedVoices[currentVoiceIdx];
+          debugLog(`🎤 Voz Azure seleccionada: ${voiceName} (índice: ${currentVoiceIdx})`);
+          
+          const queryString = new URLSearchParams({
+            ...ttsConfig.params,
+            text: text,
+            voiceName,
+          });
+
+          let azureWorking = false;
+          for (const [index, url] of ttsConfig.domain.entries()) {
+            const fullUrl = `${url}api/aiyue?${queryString}`;
+            debugLog(`🔗 Probando Azure ${index + 1}: ${fullUrl}`);
+            
+            try {
+              const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Azure TTS timeout after 2 seconds')), 2000);
+              });
+              
+              const fetchPromise = fetch(fullUrl, {
+                method: 'HEAD',
+                cache: 'no-cache',
+                headers: {
+                  'Accept': 'audio/*'
+                }
+              });
+              
+              const response = await Promise.race([fetchPromise, timeoutPromise]);
+              
+              debugLog(`📡 Respuesta Azure ${index + 1}: ${response.status} ${response.statusText}`);
+              
+              if (response.ok && response.status === 200) {
+                const contentType = response.headers.get('content-type');
+                const contentLength = response.headers.get('content-length');
+                debugLog(`📄 Content-Type: ${contentType}, Content-Length: ${contentLength}`);
+                
+                if (contentType && 
+                    (contentType.includes('audio') || contentType.includes('mpeg') || contentType.includes('mp3')) &&
+                    contentLength && parseInt(contentLength) > 1000) {
+                  
+                  debugLog(`✅ Azure TTS ${index + 1} VERIFICADO como funcional`, 'success');
+                  azureWorking = true;
+                  
+                  ttsConfig.domain.forEach((sourceUrl, sourceIndex) => {
+                    const source = document.createElement("source");
+                    const sourceFullUrl = `${sourceUrl}api/aiyue?${queryString}`;
+                    source.src = sourceFullUrl;
+                    source.type = "audio/mpeg";
+                    audio.appendChild(source);
+                    debugLog(`🔗 Fuente Azure ${sourceIndex + 1}: ${sourceFullUrl}`);
+                  });
+                  
+                  audio.addEventListener('error', (e) => {
+                    debugLog(`❌ Error Azure durante reproducción: ${e.type}, code: ${audio.error?.code}`, 'error');
+                    debugLog('🔄 FORZANDO fallback a TikTok por error de reproducción');
+                    globalTiktokFallback = true; // Set global fallback
+                    debugLog('🌐 ✅ ACTIVANDO TikTok fallback global PERMANENTE - Azure no se volverá a intentar', 'warning');
+                    if (audio.parentNode) audio.remove();
+                    setTimeout(() => createAndPlayTTS(text, container, selectedVoices, currentVoiceIdx, true, selectedTiktokVoices), 100);
+                  });
+                  
+                  break;
+                } else {
+                  debugLog(`❌ Azure ${index + 1} content inválido: Type=${contentType}, Length=${contentLength}`, 'error');
+                }
+              } else {
+                debugLog(`❌ Azure ${index + 1} HTTP error: ${response.status} ${response.statusText}`, 'error');
+              }
+            } catch (fetchError) {
+              debugLog(`❌ Azure ${index + 1} fetch failed: ${fetchError.message}`, 'error');
+            }
+          }
+          
+          if (!azureWorking) {
+            debugLog('❌ Todas las fuentes de Azure TTS fallaron - Forzando TikTok fallback inmediato', 'error');
+            globalTiktokFallback = true; // Set global fallback
+            debugLog('🌐 ✅ ACTIVANDO TikTok fallback global PERMANENTE - Azure no se volverá a intentar', 'warning');
+            throw new Error('All Azure TTS sources failed - forcing immediate TikTok fallback');
+          }
+        } else {
+          debugLog('🟡 Usando TikTok fallback directamente');
+          throw new Error('Using TikTok fallback');
+        }
+      } catch (error) {
+        debugLog('🔄 Usando TikTok TTS como respaldo', 'warning');
+        
+        if (audio.parentNode) {
+          debugLog('🗑️ Removiendo audio de Azure fallido');
+          audio.remove();
+        }
+
+        try {
+          const tiktokVoice = selectedTiktokVoices.length > 0 
+            ? selectedTiktokVoices[currentVoiceIdx] 
+            : tiktokVoices[Math.floor(Math.random() * tiktokVoices.length)];
+          debugLog(`🎤 Voz TikTok seleccionada: ${tiktokVoice} (${selectedTiktokVoices.length > 0 ? `índice: ${currentVoiceIdx}` : 'aleatorio'})`);
+          
+          const audioUrl = await createTiktokAudio(text, tiktokVoice);
+          
+          const newAudio = document.createElement("audio");
+          newAudio.preload = "none";
+          newAudio.src = audioUrl;
+          
+          newAudio.addEventListener('loadstart', () => {
+            debugLog('✅ TikTok audio loadstart', 'success');
+          });
+          newAudio.addEventListener('canplaythrough', () => {
+            debugLog('✅ TikTok audio canplaythrough', 'success');
+          });
+          newAudio.addEventListener('error', (e) => {
+            debugLog(`❌ TikTok audio error: ${e.type}`, 'error');
+          });
+          
+          const ttsBtn = container.querySelector('.tts-button');
+          if (ttsBtn) {
+            container.insertBefore(newAudio, ttsBtn);
+          } else {
+            container.appendChild(newAudio);
+          }
+          debugLog('📽️ Audio TikTok insertado en el DOM', 'success');
+          
+          return newAudio;
+          
+        } catch (tiktokError) {
+          debugLog(`❌ Tanto Azure como TikTok TTS fallaron: ${tiktokError.message}`, 'error');
+          const silentAudio = document.createElement("audio");
+          silentAudio.preload = "none";
+          const ttsBtn = container.querySelector('.tts-button');
+          if (ttsBtn) {
+            container.insertBefore(silentAudio, ttsBtn);
+          } else {
+            container.appendChild(silentAudio);
+          }
+          debugLog('🔇 Audio silencioso creado como último recurso', 'warning');
+          return silentAudio;
+        }
+      }
+
+      const ttsBtn = container.querySelector('.tts-button');
+      if (ttsBtn) {
+        container.insertBefore(audio, ttsBtn);
+      } else {
+        container.appendChild(audio);
+      }
+      debugLog('📽️ Audio Azure insertado en el DOM');
+      return audio;
+    }
+    
+    function processLevelBadge() {
+      const levelBadge = document.querySelector('.level-badge');
+      if (!levelBadge) return;
+      
+      const tagsContent = levelBadge.textContent || levelBadge.innerText || '';
+      if (!tagsContent) {
+        levelBadge.style.display = 'none';
+        return;
+      }
+      
+      // Extract all levels from tags (A1, A2, B1, B2, C1, C2, duplicate)
+      const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'duplicate'];
+      const foundLevels = levels.filter(level => 
+        tagsContent.toLowerCase().includes(level.toLowerCase())
+      );
+      
+      if (foundLevels.length === 0) {
+        levelBadge.style.display = 'none';
+        return;
+      }
+      
+      // Clear the original badge content
+      levelBadge.innerHTML = '';
+      
+      // Create individual badges for each found level
+      foundLevels.forEach((level, index) => {
+        const badge = document.createElement('span');
+        badge.textContent = level.toUpperCase();
+        badge.className = `level-badge level-${level.toLowerCase()}`;
+        
+        // Add some spacing between badges if there are multiple
+        if (index > 0) {
+          badge.style.marginLeft = '4px';
+        }
+        
+        levelBadge.appendChild(badge);
+      });
+      
+      // Remove the original level-badge class since we're using it as a container now
+      levelBadge.className = 'level-badges-container';
+    }
+
+    function cleanExampleSentenceForCoca(sentenceHTML) {
+      if (typeof sentenceHTML !== 'string' || !sentenceHTML) return "";
+      let cleaned = sentenceHTML;
+      cleaned = cleaned.replace(/\s+/g, ' ');
+      return cleaned.trim();
+    }
+  
+    function applyCocaExampleCleaning() {
+      const exampleItems = document.querySelectorAll('article.card .examples-section .example-item');
+      exampleItems.forEach(item => {
+        if (item.innerHTML) {
+          const originalHTML = item.innerHTML;
+          const cleanedHTML = cleanExampleSentenceForCoca(originalHTML);
+          if (originalHTML !== cleanedHTML) {
+            item.innerHTML = cleanedHTML;
+          }
+        }
+      });
+    }
+
+    function highlightWordInExamples() {
+      const wordElement = document.querySelector(".word");
+      if (!wordElement) return;
+
+      const targetWord = wordElement.textContent || wordElement.innerText || "";
+      if (!targetWord) return;
+
+      const cleanWord = targetWord.toLowerCase().trim();
+      if (!cleanWord) return;
+
+      const generateVariations = (word) => {
+        const variations = new Set([word]);
+
+        // Basic plurals and verb forms
+        if (
+          word.endsWith("y") &&
+          word.length > 2 &&
+          !"aeiou".includes(word[word.length - 2])
+        ) {
+          variations.add(word.slice(0, -1) + "ies");
+          variations.add(word.slice(0, -1) + "ied");
+          variations.add(word.slice(0, -1) + "ying");
+          variations.add(word.slice(0, -1) + "ier");
+          variations.add(word.slice(0, -1) + "iest");
+          variations.add(word.slice(0, -1) + "ily");
+        } else if (
+          word.endsWith("s") ||
+          word.endsWith("sh") ||
+          word.endsWith("ch") ||
+          word.endsWith("x") ||
+          word.endsWith("z")
+        ) {
+          variations.add(word + "es");
+        } else {
+          variations.add(word + "s");
+        }
+
+        // Past tense, gerund, and comparative forms
+        if (word.endsWith("e")) {
+          variations.add(word + "d");
+          variations.add(word + "r");
+          variations.add(word + "rs");
+          variations.add(word + "st");
+          variations.add(word.slice(0, -1) + "ing");
+          variations.add(word.slice(0, -1) + "ely");
+          variations.add(word.slice(0, -1) + "ness");
+        } else {
+          variations.add(word + "ed");
+          variations.add(word + "er");
+          variations.add(word + "ers");
+          variations.add(word + "est");
+          variations.add(word + "ing");
+          variations.add(word + "ly");
+          variations.add(word + "ness");
+          variations.add(word + "ment");
+          variations.add(word + "ful");
+          variations.add(word + "less");
+
+          // Double consonant rules
+          if (
+            word.length >= 3 &&
+            !"aeiou".includes(word[word.length - 1]) &&
+            "aeiou".includes(word[word.length - 2]) &&
+            !"aeiouwxy".includes(word[word.length - 1])
+          ) {
+            const lastChar = word[word.length - 1];
+            variations.add(word + lastChar + "ing");
+            variations.add(word + lastChar + "ed");
+            variations.add(word + lastChar + "er");
+            variations.add(word + lastChar + "est");
+          }
+        }
+
+        // Adverb forms from adjectives
+        if (word.endsWith("ic")) {
+          variations.add(word + "ally");
+        } else if (word.endsWith("le")) {
+          variations.add(word.slice(0, -2) + "ly");
+        } else if (word.endsWith("ful")) {
+          variations.add(word + "ly");
+        } else if (word.endsWith("al")) {
+          variations.add(word + "ly");
+        }
+
+        // Negative prefixes
+        variations.add("un" + word);
+        variations.add("in" + word);
+        variations.add("im" + word);
+        variations.add("ir" + word);
+        variations.add("il" + word);
+        variations.add("dis" + word);
+        variations.add("mis" + word);
+        variations.add("non" + word);
+
+        // Additional verb forms
+        if (word.length > 3) {
+          // Third person singular present
+          if (word.endsWith("o") || word.endsWith("s") || word.endsWith("sh") || word.endsWith("ch") || word.endsWith("x") || word.endsWith("z")) {
+            variations.add(word + "es");
+          }
+          
+          // Past participle variations
+          if (word.endsWith("e")) {
+            variations.add(word + "n");
+          } else {
+            variations.add(word + "en");
+          }
+        }
+
+        // Noun forms
+        variations.add(word + "ion");
+        variations.add(word + "tion");
+        variations.add(word + "sion");
+        variations.add(word + "ation");
+        variations.add(word + "ness");
+        variations.add(word + "ity");
+        variations.add(word + "ability");
+        variations.add(word + "ment");
+        variations.add(word + "ance");
+        variations.add(word + "ence");
+
+        // Agent nouns
+        variations.add(word + "er");
+        variations.add(word + "or");
+        variations.add(word + "ist");
+        variations.add(word + "ian");
+
+        // Adjective forms
+        variations.add(word + "ive");
+        variations.add(word + "ous");
+        variations.add(word + "al");
+        variations.add(word + "ic");
+        variations.add(word + "able");
+        variations.add(word + "ible");
+
+        // Irregular forms handling (add common ones)
+        const irregularForms = {
+          be: ["am", "is", "are", "was", "were", "been", "being"],
+          have: ["has", "had", "having"],
+          do: ["does", "did", "done", "doing"],
+          go: ["goes", "went", "gone", "going"],
+          get: ["gets", "got", "gotten", "getting"],
+          make: ["makes", "made", "making"],
+          take: ["takes", "took", "taken", "taking"],
+          come: ["comes", "came", "coming"],
+          see: ["sees", "saw", "seen", "seeing"],
+          know: ["knows", "knew", "known", "knowing"],
+          think: ["thinks", "thought", "thinking"],
+          say: ["says", "said", "saying"],
+          tell: ["tells", "told", "telling"],
+          find: ["finds", "found", "finding"],
+          give: ["gives", "gave", "given", "giving"],
+          work: ["works", "worked", "working"],
+          call: ["calls", "called", "calling"],
+          try: ["tries", "tried", "trying"],
+          ask: ["asks", "asked", "asking"],
+          need: ["needs", "needed", "needing"],
+          feel: ["feels", "felt", "feeling"],
+          become: ["becomes", "became", "becoming"],
+          leave: ["leaves", "left", "leaving"],
+          put: ["puts", "putting"],
+          mean: ["means", "meant", "meaning"],
+          keep: ["keeps", "kept", "keeping"],
+          let: ["lets", "letting"],
+          begin: ["begins", "began", "begun", "beginning"],
+          seem: ["seems", "seemed", "seeming"],
+          help: ["helps", "helped", "helping"],
+          show: ["shows", "showed", "shown", "showing"],
+          hear: ["hears", "heard", "hearing"],
+          play: ["plays", "played", "playing"],
+          run: ["runs", "ran", "running"],
+          move: ["moves", "moved", "moving"],
+          live: ["lives", "lived", "living"],
+          believe: ["believes", "believed", "believing"],
+          hold: ["holds", "held", "holding"],
+          bring: ["brings", "brought", "bringing"],
+          happen: ["happens", "happened", "happening"],
+          write: ["writes", "wrote", "written", "writing"],
+          sit: ["sits", "sat", "sitting"],
+          stand: ["stands", "stood", "standing"],
+          lose: ["loses", "lost", "losing"],
+          pay: ["pays", "paid", "paying"],
+          meet: ["meets", "met", "meeting"],
+          include: ["includes", "included", "including"],
+          continue: ["continues", "continued", "continuing"],
+          set: ["sets", "setting"],
+          learn: ["learns", "learned", "learnt", "learning"],
+          change: ["changes", "changed", "changing"],
+          lead: ["leads", "led", "leading"],
+          understand: ["understands", "understood", "understanding"],
+          watch: ["watches", "watched", "watching"],
+          follow: ["follows", "followed", "following"],
+          stop: ["stops", "stopped", "stopping"],
+          create: ["creates", "created", "creating"],
+          speak: ["speaks", "spoke", "spoken", "speaking"],
+          read: ["reads", "reading"], // 'read' past tense is same spelling
+          spend: ["spends", "spent", "spending"],
+          grow: ["grows", "grew", "grown", "growing"],
+          open: ["opens", "opened", "opening"],
+          walk: ["walks", "walked", "walking"],
+          win: ["wins", "won", "winning"],
+          teach: ["teaches", "taught", "teaching"],
+          offer: ["offers", "offered", "offering"],
+          remember: ["remembers", "remembered", "remembering"],
+          consider: ["considers", "considered", "considering"],
+          appear: ["appears", "appeared", "appearing"],
+          buy: ["buys", "bought", "buying"],
+          serve: ["serves", "served", "serving"],
+          die: ["dies", "died", "dying"],
+          send: ["sends", "sent", "sending"],
+          build: ["builds", "built", "building"],
+          stay: ["stays", "stayed", "staying"],
+          fall: ["falls", "fell", "fallen", "falling"],
+          cut: ["cuts", "cutting"],
+          reach: ["reaches", "reached", "reaching"],
+          kill: ["kills", "killed", "killing"],
+          raise: ["raises", "raised", "raising"],
+          pass: ["passes", "passed", "passing"],
+          sell: ["sells", "sold", "selling"],
+          decide: ["decides", "decided", "deciding"],
+          return: ["returns", "returned", "returning"],
+          explain: ["explains", "explained", "explaining"],
+          hope: ["hopes", "hoped", "hoping"],
+          develop: ["develops", "developed", "developing"],
+          carry: ["carries", "carried", "carrying"],
+          break: ["breaks", "broke", "broken", "breaking"],
+          receive: ["receives", "received", "receiving"],
+          agree: ["agrees", "agreed", "agreeing"],
+          support: ["supports", "supported", "supporting"],
+          hit: ["hits", "hitting"],
+          produce: ["produces", "produced", "producing"],
+          eat: ["eats", "ate", "eaten", "eating"],
+          cover: ["covers", "covered", "covering"],
+          catch: ["catches", "caught", "catching"],
+          draw: ["draws", "drew", "drawn", "drawing"],
+          choose: ["chooses", "chose", "chosen", "choosing"],
+          cause: ["causes", "caused", "causing"],
+          point: ["points", "pointed", "pointing"],
+          plan: ["plans", "planned", "planning"],
+          expect: ["expects", "expected", "expecting"],
+          pick: ["picks", "picked", "picking"],
+          remain: ["remains", "remained", "remaining"],
+          suggest: ["suggests", "suggested", "suggesting"],
+          push: ["pushes", "pushed", "pushing"],
+          pull: ["pulls", "pulled", "pulling"],
+          drop: ["drops", "dropped", "dropping"],
+          count: ["counts", "counted", "counting"],
+          add: ["adds", "added", "adding"],
+          save: ["saves", "saved", "saving"],
+          join: ["joins", "joined", "joining"],
+          reduce: ["reduces", "reduced", "reducing"],
+          establish: ["establishes", "established", "establishing"],
+          remove: ["removes", "removed", "removing"],
+          close: ["closes", "closed", "closing"],
+          answer: ["answers", "answered", "answering"],
+          allow: ["allows", "allowed", "allowing"],
+          control: ["controls", "controlled", "controlling"],
+          rise: ["rises", "rose", "risen", "rising"],
+          result: ["results", "resulted", "resulting"],
+          apply: ["applies", "applied", "applying"],
+          end: ["ends", "ended", "ending"],
+          protect: ["protects", "protected", "protecting"],
+          require: ["requires", "required", "requiring"],
+          general: ["generally"],
+          public: ["publicly"],
+          social: ["socially"],
+          economic: ["economically"],
+          political: ["politically"],
+          international: ["internationally"],
+          national: ["nationally"],
+          local: ["locally"],
+          personal: ["personally"],
+          special: ["specially"],
+          medical: ["medically"],
+          legal: ["legally"],
+          financial: ["financially"],
+          physical: ["physically"],
+          natural: ["naturally"],
+          human: ["humanly"],
+          real: ["really"],
+          possible: ["possibly"],
+          available: ["availability"],
+          important: ["importantly"],
+          different: ["differently"],
+          small: ["smaller", "smallest"],
+          large: ["larger", "largest"],
+          great: ["greater", "greatest"],
+          high: ["higher", "highest"],
+          low: ["lower", "lowest"],
+          long: ["longer", "longest"],
+          short: ["shorter", "shortest"],
+          new: ["newer", "newest"],
+          old: ["older", "oldest"],
+          young: ["younger", "youngest"],
+          good: ["better", "best"],
+          bad: ["worse", "worst"],
+          big: ["bigger", "biggest"],
+          little: ["less", "least"],
+          many: ["more", "most"],
+          much: ["more", "most"],
+          few: ["fewer", "fewest"],
+          far: ["farther", "farthest", "further", "furthest"],
+        };
+
+        if (irregularForms[word]) {
+          irregularForms[word].forEach((form) => variations.add(form));
+        }
+
+        // Add capitalized versions
+        const originalVariations = Array.from(variations);
+        originalVariations.forEach((variant) => {
+          variations.add(variant.charAt(0).toUpperCase() + variant.slice(1));
+          variations.add(variant.toUpperCase());
+        });
+
+        return Array.from(variations);
+      };
+
+      const wordVariations = generateVariations(cleanWord);
+
+      // Create more flexible regex patterns
+      const exactPattern =
+        "\\b(" +
+        wordVariations
+          .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join("|") +
+        ")\\b";
+      const exactRegex = new RegExp(exactPattern, "gi");
+
+      // Optional: Add pattern for partial matches within compound words
+      const partialPattern =
+        "(" +
+        wordVariations
+          .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+          .join("|") +
+        ")";
+      const partialRegex = new RegExp(partialPattern, "gi");
+
+      document.querySelectorAll(".example-item").forEach((item) => {
+        const originalHTML = item.innerHTML;
+
+        // Skip if already processed
+        if (item.querySelector("em")) {
+          // Preserve existing highlights and add new ones
+          const emTags = [];
+          let tempHTML = originalHTML.replace(
+            /<em[^>]*>.*?<\/em>/gi,
+            (match) => {
+              const placeholder = `__EM_PLACEHOLDER_${emTags.length}__`;
+              emTags.push(match);
+              return placeholder;
+            }
+          );
+
+          // Apply highlighting to non-highlighted text
+          tempHTML = tempHTML.replace(exactRegex, "<em>$1</em>");
+
+          // Restore original em tags
+          emTags.forEach((tag, index) => {
+            tempHTML = tempHTML.replace(`__EM_PLACEHOLDER_${index}__`, tag);
+          });
+
+          if (originalHTML !== tempHTML) {
+            item.innerHTML = tempHTML;
+          }
+        } else {
+          // Apply highlighting to fresh text
+          let highlightedHTML = originalHTML.replace(exactRegex, "<em>$1</em>");
+
+          // If no exact matches found, try partial matching for compound words
+          if (originalHTML === highlightedHTML) {
+            const textContent = item.textContent || item.innerText || "";
+            const words = textContent.toLowerCase().split(/\s+/);
+            const hasCompoundMatch = words.some((word) =>
+              wordVariations.some(
+                (variant) =>
+                  word.includes(variant) &&
+                  word !== variant &&
+                  word.length > variant.length + 2
+              )
+            );
+
+            if (hasCompoundMatch) {
+              highlightedHTML = originalHTML.replace(
+                partialRegex,
+                "<em>$1</em>"
+              );
+            }
+          }
+
+          if (originalHTML !== highlightedHTML) {
+            item.innerHTML = highlightedHTML;
+          }
+        }
+      });
+    }
+
+  
+    function setExampleTTS() {
+      debugLog('🎯 Configurando botones TTS para ejemplos');
+      
+      const getExampleText = (exampleElement) => {
+        if (!exampleElement) return '';
+        let text = exampleElement.textContent || exampleElement.innerText || '';
+        text = text.replace(/\[.*?\]/g, ''); 
+        const equalsIndex = text.indexOf('=');
+        if (equalsIndex !== -1) {
+          text = text.substring(0, equalsIndex);
+        }
+        text = text.replace(/\s+/g, ' '); 
+        return text.trim();
+      };
+      
+      document.querySelectorAll('.example-sentence').forEach((sentence, index) => {
+        const exampleItem = sentence.querySelector('.example-item');
+        const audioContainer = sentence.querySelector('.example-audio');
+        if (!exampleItem || !audioContainer) return;
+        
+        const text = getExampleText(exampleItem);
+        if (!text) return;
+        
+        debugLog(`🎯 Configurando ejemplo ${index + 1}: "${text.substring(0, 30)}${text.length > 30 ? '...' : ''}"`);
+        
+        const selectedVoices = getRandomVoices(voices, 4);
+        const selectedTiktokVoices = getRandomVoices(tiktokVoices, 4);
+        let currentVoiceIdx = 0;
+        
+        debugLog(`📝 Voces Azure para ejemplo ${index + 1}: ${selectedVoices.join(', ')}`);
+        debugLog(`📝 Voces TikTok para ejemplo ${index + 1}: ${selectedTiktokVoices.join(', ')}`);
+        
+        // Create button HTML
+        audioContainer.innerHTML = '';
+        audioContainer.insertAdjacentHTML(
+          'beforeend',
+          '<a class="tts-button audio-button soundLink"><svg viewBox="0 0 24 24"><path d="M5.25 9v6h4l5 5V4L9.25 9H5.25z M18.75 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg></a>'
+        );
+        
+        const ttsBtn = audioContainer.querySelector('.tts-button');
+        debugLog(`✅ Botón ejemplo ${index + 1} creado`);
+        
+        // Create initial audio
+        createAndPlayTTS(text, audioContainer, selectedVoices, currentVoiceIdx, globalTiktokFallback, selectedTiktokVoices).then(() => {
+          debugLog(`✅ Audio inicial ejemplo ${index + 1} creado`);
+        }).catch(error => {
+          debugLog(`⚠️ Error creando audio inicial ejemplo ${index + 1}: ${error.message}`);
+        });
+        
+        ttsBtn.addEventListener('click', async (e) => {
+          e.preventDefault();
+          debugLog(`🖱️ Click en botón ejemplo ${index + 1}`);
+          
+          // Cycle to next voice
+          const oldVoiceIdx = currentVoiceIdx;
+          if (globalTiktokFallback) {
+            currentVoiceIdx = (currentVoiceIdx + 1) % selectedTiktokVoices.length;
+            debugLog(`🔄 Cambiando voz TikTok ejemplo ${index + 1}: ${selectedTiktokVoices[oldVoiceIdx]} → ${selectedTiktokVoices[currentVoiceIdx]}`);
+          } else {
+            currentVoiceIdx = (currentVoiceIdx + 1) % selectedVoices.length;
+            debugLog(`🔄 Cambiando voz Azure ejemplo ${index + 1}: ${selectedVoices[oldVoiceIdx]} → ${selectedVoices[currentVoiceIdx]}`);
+          }
+          
+          try {
+            const audio = await createAndPlayTTS(text, audioContainer, selectedVoices, currentVoiceIdx, globalTiktokFallback, selectedTiktokVoices);
+            if (audio) {
+              debugLog(`▶️ Intentando reproducir audio ejemplo ${index + 1}`);
+              audio.currentTime = 0;
+              
+              try {
+                await audio.play();
+                debugLog(`✅ Audio ejemplo ${index + 1} reproduciéndose correctamente`, 'success');
+              } catch (playError) {
+                debugLog(`⚠️ Auto-reproducción ejemplo ${index + 1} bloqueada: ${playError.message}`, 'warning');
+                if (!hasUserInteracted) {
+                  debugLog(`ℹ️ Audio ejemplo ${index + 1} se reproducirá con la primera interacción del usuario`);
+                  pendingAudioToPlay = audio;
+                }
+              }
+            }
+          } catch (error) {
+            debugLog(`❌ Error en TTS ejemplo ${index + 1}: ${error.message}`, 'error');
+          }
+        });
+        
+        debugLog(`✅ Configuración ejemplo ${index + 1} completada`);
+      });
+      
+      debugLog('✅ Configuración de todos los ejemplos TTS completada');
+    }
+  
+    function setWordTTS() {
+      debugLog('🎯 Iniciando configuración de TTS para palabra');
+      
+      const selectedVoices = getRandomVoices(voices, 4);
+      const selectedTiktokVoices = getRandomVoices(tiktokVoices, 4);
+      let currentVoiceIdx = 0;
+      
+      const word = document.querySelector('.word')?.textContent?.trim();
+      const audioButton = document.querySelector('.word-audio-button');
+      
+      if (!word) {
+        debugLog('❌ No se encontró la palabra en el elemento .word', 'error');
+        return;
+      }
+      if (!audioButton) {
+        debugLog('❌ No se encontró el botón de audio .word-audio-button', 'error');
+        return;
+      }
+      
+      debugLog(`🎯 Palabra encontrada: "${word}"`);
+      debugLog(`📝 Voces Azure seleccionadas: ${selectedVoices.join(', ')}`);
+      debugLog(`📝 Voces TikTok seleccionadas: ${selectedTiktokVoices.join(', ')}`);
+      if (globalTiktokFallback) {
+        debugLog('🌐 Iniciando con TikTok fallback global activo', 'warning');
+      }
+      
+      // Create button HTML
+      audioButton.innerHTML = '';
+      audioButton.insertAdjacentHTML(
+        'beforeend',
+        '<a class="tts-button audio-button soundLink"><svg viewBox="0 0 24 24"><path d="M5.25 9v6h4l5 5V4L9.25 9H5.25z M18.75 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg></a>'
+      );
+      
+      const ttsBtn = audioButton.querySelector('.tts-button');
+      debugLog('✅ Botón de audio creado');
+      
+      // Create initial audio
+      debugLog('🎯 Creando audio inicial');
+      createAndPlayTTS(word, audioButton, selectedVoices, currentVoiceIdx, globalTiktokFallback, selectedTiktokVoices).then(() => {
+        debugLog('✅ Audio inicial creado');
+      }).catch(error => {
+        debugLog(`⚠️ Error creando audio inicial: ${error.message}`);
+      });
+      
+      ttsBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        debugLog('🖱️ Click en botón de palabra');
+        
+        // Cycle to next voice based on current global fallback state
+        const oldVoiceIdx = currentVoiceIdx;
+        if (globalTiktokFallback) {
+          currentVoiceIdx = (currentVoiceIdx + 1) % selectedTiktokVoices.length;
+          debugLog(`🔄 Cambiando voz TikTok: ${selectedTiktokVoices[oldVoiceIdx]} → ${selectedTiktokVoices[currentVoiceIdx]}`);
+        } else {
+          currentVoiceIdx = (currentVoiceIdx + 1) % selectedVoices.length;
+          debugLog(`🔄 Cambiando voz Azure: ${selectedVoices[oldVoiceIdx]} → ${selectedVoices[currentVoiceIdx]}`);
+        }
+        
+        try {
+          const audio = await createAndPlayTTS(word, audioButton, selectedVoices, currentVoiceIdx, globalTiktokFallback, selectedTiktokVoices);
+          if (audio) {
+            debugLog('▶️ Intentando reproducir audio');
+            audio.currentTime = 0;
+            
+            try {
+              await audio.play();
+              debugLog('✅ Audio reproduciéndose correctamente', 'success');
+            } catch (playError) {
+              debugLog(`⚠️ Auto-reproducción bloqueada: ${playError.message}`, 'warning');
+              if (!hasUserInteracted) {
+                debugLog('ℹ️ Audio se reproducirá con la primera interacción del usuario');
+                pendingAutoplay = { audio: audio };
+              }
+            }
+          }
+        } catch (error) {
+          debugLog(`❌ Error en TTS de palabra: ${error.message}`, 'error');
+        }
+      });
+      
+      debugLog('✅ Configuración de TTS de palabra completada');
+    }
+  
+    
+  
+    function setDefinitionTTS() {
+      debugLog('🎯 Iniciando configuración de TTS para definición');
+      
+      const selectedVoices = getRandomVoices(voices, 4);
+      const selectedTiktokVoices = getRandomVoices(tiktokVoices, 4);
+      let currentVoiceIdx = 0;
+      
+      const definition = document.querySelector('.definition-content')?.textContent?.trim();
+      const audioButton = document.querySelector('.definition-audio-button');
+      
+      if (!definition) {
+        debugLog('❌ No se encontró la definición', 'error');
+        return;
+      }
+      if (!audioButton) {
+        debugLog('❌ No se encontró el botón de audio de definición', 'error');
+        return;
+      }
+      
+      debugLog(`🎯 Definición encontrada: "${definition.substring(0, 30)}${definition.length > 30 ? '...' : ''}"`);
+      debugLog(`📝 Voces Azure seleccionadas: ${selectedVoices.join(', ')}`);
+      debugLog(`📝 Voces TikTok seleccionadas: ${selectedTiktokVoices.join(', ')}`);
+      
+      audioButton.innerHTML = '';
+      audioButton.insertAdjacentHTML(
+        'beforeend',
+        '<a class="tts-button audio-button soundLink"><svg viewBox="0 0 24 24"><path d="M5.25 9v6h4l5 5V4L9.25 9H5.25z M18.75 12c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg></a>'
+      );
+      
+      const ttsBtn = audioButton.querySelector('.tts-button');
+      debugLog('✅ Botón de definición creado');
+      
+      // Create initial audio
+      createAndPlayTTS(definition, audioButton, selectedVoices, currentVoiceIdx, globalTiktokFallback, selectedTiktokVoices).then(() => {
+        debugLog('✅ Audio inicial de definición creado');
+      }).catch(error => {
+        debugLog(`⚠️ Error creando audio inicial de definición: ${error.message}`);
+      });
+      
+      ttsBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        debugLog('🖱️ Click en botón de definición');
+        
+        // Cycle to next voice
+        const oldVoiceIdx = currentVoiceIdx;
+        if (globalTiktokFallback) {
+          currentVoiceIdx = (currentVoiceIdx + 1) % selectedTiktokVoices.length;
+          debugLog(`🔄 Cambiando voz TikTok: ${selectedTiktokVoices[oldVoiceIdx]} → ${selectedTiktokVoices[currentVoiceIdx]}`);
+        } else {
+          currentVoiceIdx = (currentVoiceIdx + 1) % selectedVoices.length;
+          debugLog(`🔄 Cambiando voz Azure: ${selectedVoices[oldVoiceIdx]} → ${selectedVoices[currentVoiceIdx]}`);
+        }
+        
+        try {
+          const audio = await createAndPlayTTS(definition, audioButton, selectedVoices, currentVoiceIdx, globalTiktokFallback, selectedTiktokVoices);
+          if (audio) {
+            debugLog('▶️ Intentando reproducir audio de definición');
+            audio.currentTime = 0;
+            
+            try {
+              await audio.play();
+              debugLog('✅ Audio de definición reproduciéndose correctamente', 'success');
+            } catch (playError) {
+              debugLog(`⚠️ Auto-reproducción de definición bloqueada: ${playError.message}`, 'warning');
+              if (!hasUserInteracted) {
+                debugLog('ℹ️ Audio de definición se reproducirá con la primera interacción del usuario');
+                pendingAutoplay = { audio: audio };
+              }
+            }
+          }
+        } catch (error) {
+          debugLog(`❌ Error en TTS de definición: ${error.message}`, 'error');
+        }
+      });
+      
+      debugLog('✅ Configuración de TTS de definición completada');
+    }
+  
+    // Function to wait for all audios to be ready and then start auto-play
+    function waitForAudiosAndAutoplay() {
+      const maxAttempts = 15; // Aumentar intentos
+      let attempts = 0;
+      
+      const checkAudios = () => {
+        attempts++;
+        debugLog(`🔍 Intento ${attempts}: Verificando audios disponibles`);
+        
+        const wordAudio = document.querySelector(".word-audio-button audio");
+        const definitionAudio = document.querySelector(".definition-audio-button audio");
+        const exampleAudios = document.querySelectorAll(".example-audio audio");
+        
+        debugLog(`📊 Detalles de audios:`);
+        debugLog(`  - Palabra: ${wordAudio ? 'ENCONTRADO' : 'NO ENCONTRADO'}`);
+        debugLog(`  - Definición: ${definitionAudio ? 'ENCONTRADO' : 'NO ENCONTRADO'}`);
+        debugLog(`  - Ejemplos: ${exampleAudios.length} encontrados`);
+        
+        // Count examples that should exist
+        const exampleItems = document.querySelectorAll('.example-sentence .example-item');
+        const expectedExamples = exampleItems.length;
+        debugLog(`  - Ejemplos esperados: ${expectedExamples}`);
+        
+        const totalExpected = 2 + expectedExamples; // word + definition + examples
+        const totalFound = (wordAudio ? 1 : 0) + (definitionAudio ? 1 : 0) + exampleAudios.length;
+        
+        debugLog(`📊 Audios encontrados: ${totalFound}/${totalExpected}`);
+        
+        // Start if we have at least 2 audios OR we've tried enough times
+        if ((totalFound >= 2 && attempts >= 5) || attempts >= maxAttempts) {
+          debugLog('✅ Condiciones cumplidas - Iniciando auto-play');
+          playAllAudiosSequentially();
+        } else {
+          debugLog(`⏳ Esperando más audios... Reintentando en 600ms`);
+          setTimeout(checkAudios, 600);
+        }
+      };
+      
+      // Start checking after a longer initial delay
+      setTimeout(checkAudios, 1500);
+    }
+    
+    function playAllAudiosSequentially() {
+      debugLog('🎵 Iniciando playAllAudiosSequentially');
+      const audios = [];
+      
+      // Add word audio
+      const wordAudio = document.querySelector(".word-audio-button audio");
+      if (wordAudio) {
+        audios.push({ element: wordAudio, type: 'word' });
+        debugLog(`🎵 Audio de palabra encontrado: readyState=${wordAudio.readyState}, src=${wordAudio.src ? 'con src' : 'sin src'}`);
+      }
+      
+      // Add definition audio
+      const definitionAudio = document.querySelector(".definition-audio-button audio");
+      if (definitionAudio) {
+        audios.push({ element: definitionAudio, type: 'definition' });
+        debugLog(`🎵 Audio de definición encontrado: readyState=${definitionAudio.readyState}, src=${definitionAudio.src ? 'con src' : 'sin src'}`);
+      }
+      
+      // Add example audios
+      document.querySelectorAll(".example-audio audio").forEach((audio, index) => {
+        if (audio) {
+          audios.push({ element: audio, type: `example-${index + 1}` });
+          debugLog(`🎵 Audio de ejemplo ${index + 1} encontrado: readyState=${audio.readyState}, src=${audio.src ? 'con src' : 'sin src'}`);
+        }
+      });
+      
+      if (audios.length === 0) {
+        debugLog('⚠️ No se encontraron audios para reproducir en secuencia');
+        return;
+      }
+      
+      debugLog(`🎵 Iniciando reproducción secuencial de ${audios.length} audios`);
+      let idx = 0;
+      
+      const playNext = () => {
+        if (idx < audios.length) {
+          const audioData = audios[idx];
+          const currentAudio = audioData.element;
+          debugLog(`🎵 Reproduciendo audio ${idx + 1}/${audios.length} (${audioData.type})`);
+          debugLog(`📊 Estado del audio: readyState=${currentAudio.readyState}, src=${currentAudio.src ? 'presente' : 'ausente'}`);
+          
+          // Try to play even if not fully ready
+          currentAudio.currentTime = 0;
+          
+          const playPromise = currentAudio.play();
+          
+          if (playPromise !== undefined) {
+            playPromise.then(() => {
+              debugLog(`✅ Audio ${idx + 1} (${audioData.type}) reproduciéndose correctamente`);
+            }).catch(error => {
+              debugLog(`⚠️ Error reproduciendo audio ${idx + 1} (${audioData.type}): ${error.message}`, 'warning');
+              
+              // Si es un error de auto-reproducción y no hemos interactuado, guardar para después
+              if (error.message.includes('user didn\'t interact') && !hasUserInteracted) {
+                debugLog(`💾 Guardando audio ${idx + 1} para reproducir tras interacción`);
+                pendingAutoplay = { audio: currentAudio };
+                setupAutoplayOnFirstInteraction();
+                return; // No continuar con el siguiente audio
+              }
+              
+              // Continuar con el siguiente audio aunque este falle
+              idx++;
+              setTimeout(playNext, 300);
+            });
+          } else {
+            debugLog(`⚠️ Play promise undefined para audio ${idx + 1}`, 'warning');
+            idx++;
+            setTimeout(playNext, 300);
+          }
+          
+          // Listener temporal para reproducción automática
+          const tempListener = () => {
+            currentAudio.removeEventListener("ended", tempListener);
+            debugLog(`✅ Audio ${idx + 1} (${audioData.type}) terminó`);
+            idx++;
+            setTimeout(playNext, 500); // Mayor delay entre audios
+          };
+          
+          // Remove any existing listeners to avoid duplicates
+          currentAudio.removeEventListener("ended", tempListener);
+          currentAudio.addEventListener("ended", tempListener);
+          
+        } else {
+          debugLog('✅ Reproducción secuencial completada');
+        }
+      };
+      
+      playNext();
+    }
+  
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', function() {
+        createDebugPanel();
+        debugLog('🚀 DOM Content Loaded - Iniciando aplicación');
+        setupAutoplayOnFirstInteraction(); // Configurar auto-reproducción
+        processLevelBadge();
+        applyCocaExampleCleaning();
+        setWordTTS();
+        setDefinitionTTS();
+        setExampleTTS();
+        if (typeof highlightWordInExamples === 'function') {
+          highlightWordInExamples();
+        }
+        waitForAudiosAndAutoplay();
+      });
+    } else {
+      createDebugPanel();
+      debugLog('🚀 DOM ya cargado - Iniciando aplicación');
+      setupAutoplayOnFirstInteraction(); // Configurar auto-reproducción
+      processLevelBadge();
+      applyCocaExampleCleaning();
+      setWordTTS();
+      setDefinitionTTS();
+      setExampleTTS();
+      if (typeof highlightWordInExamples === 'function') {
+        highlightWordInExamples();
+      }
+      waitForAudiosAndAutoplay();
+    }
+  </script>

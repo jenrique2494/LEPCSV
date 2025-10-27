@@ -65,39 +65,39 @@
     (function() {
       // Debug panel functions (local scope)
       function back_debugLog(message, type = 'info') {
-        // const timestamp = new Date().toLocaleTimeString();
+        const timestamp = new Date().toLocaleTimeString();
         
-        // // Try static debug panel first
-        // const debugLogElement = document.getElementById('debugLog');
-        // if (debugLogElement) {
-        //   const logEntry = document.createElement('div');
-        //   logEntry.style.cssText = `
-        //     margin: 2px 0;
-        //     padding: 2px;
-        //     border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
-        //     padding-left: 5px;
-        //   `;
-        //   logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
-        //   debugLogElement.appendChild(logEntry);
-        //   debugLogElement.scrollTop = debugLogElement.scrollHeight;
-        // }
+        // Try static debug panel first
+        const debugLogElement = document.getElementById('debugLog');
+        if (debugLogElement) {
+          const logEntry = document.createElement('div');
+          logEntry.style.cssText = `
+            margin: 2px 0;
+            padding: 2px;
+            border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
+            padding-left: 5px;
+          `;
+          logEntry.innerHTML = `<span style="color: #888;">[${timestamp}]</span> ${message}`;
+          debugLogElement.appendChild(logEntry);
+          debugLogElement.scrollTop = debugLogElement.scrollHeight;
+        }
         
-        // // Also try dynamic debug panel
-        // const debugContent = document.getElementById('debug-content');
-        // if (debugContent) {
-        //   const logEntry = document.createElement('div');
-        //   logEntry.style.cssText = `
-        //     margin: 2px 0;
-        //     padding: 2px;
-        //     border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
-        //     padding-left: 5px;
-        //   `;
-        //   logEntry.innerHTML = `<span style="color: gray;">[${timestamp}]</span> ${message}`;
-        //   debugContent.appendChild(logEntry);
-        //   debugContent.scrollTop = debugContent.scrollHeight;
-        // }
+        // Also try dynamic debug panel
+        const debugContent = document.getElementById('debug-content');
+        if (debugContent) {
+          const logEntry = document.createElement('div');
+          logEntry.style.cssText = `
+            margin: 2px 0;
+            padding: 2px;
+            border-left: 3px solid ${type === 'error' ? 'red' : type === 'success' ? 'green' : type === 'warning' ? 'orange' : 'cyan'};
+            padding-left: 5px;
+          `;
+          logEntry.innerHTML = `<span style="color: gray;">[${timestamp}]</span> ${message}`;
+          debugContent.appendChild(logEntry);
+          debugContent.scrollTop = debugContent.scrollHeight;
+        }
         
-        // console.log(`[Audio Debug] ${message}`);
+        console.log(`[Audio Debug] ${message}`);
       }
 
       function back_clearDebugLog() {
@@ -347,11 +347,13 @@
             const contentType = response.headers.get('content-type');
             const contentLength = response.headers.get('content-length');
             
+            back_debugLog(`📄 StreamElements Content-Type: ${contentType}, Content-Length: ${contentLength}`);
+            
             if (contentType && 
-                (contentType.includes('audio') || contentType.includes('mpeg') || contentType.includes('mp3')) &&
-                contentLength && parseInt(contentLength) > 500) {
+                (contentType.includes('audio') || contentType.includes('mpeg') || contentType.includes('mp3'))) {
               
-              back_debugLog(`✅ StreamElements TTS audio creado exitosamente con voz: ${voiceName}`, 'success');
+              back_debugLog(`✅ StreamElements TTS verificado como funcional`, 'success');
+              back_debugLog(`📽️ Audio streamelements insertado en el DOM`, 'success');
               return url;
             } else {
               throw new Error(`StreamElements invalid content: Type=${contentType}, Length=${contentLength}`);

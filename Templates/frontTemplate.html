@@ -4,7 +4,7 @@
     <h1 class="word">{{Word}}</h1>
     <div class="badges-container">
       <span class="pos-badge {{^Part of Speech}}is-empty{{/Part of Speech}}">
-        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}} 
+        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}}
         {{^Part of Speech}}&nbsp;{{/Part of Speech}}
       </span>
       <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
@@ -38,7 +38,34 @@
   </section>
 
   <script>
-    (function() {
+    (function () {
+
+      async function front_copyToClipboard(text) {
+        if (!text) return false;
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText(text);
+            return true;
+          }
+          throw new Error("Clipboard API unavailable");
+        } catch (err) {
+          try {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-9999px";
+            textArea.style.top = "0";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            const successful = document.execCommand("copy");
+            document.body.removeChild(textArea);
+            return successful;
+          } catch (fallbackErr) {
+            return false;
+          }
+        }
+      }
 
       function front_cleanExampleSentenceForCoca(sentenceHTML) {
         if (typeof sentenceHTML !== "string" || !sentenceHTML) return "";
@@ -60,37 +87,37 @@
       function front_setupCopyWordButton() {
         const copyButton = document.querySelector('.copy-word-button');
         if (!copyButton) return;
-        
+
         copyButton.addEventListener('click', async (e) => {
           e.preventDefault();
-          
-          try {
-            const wordElement = document.querySelector('.word');
-            
-            if (wordElement) {
-              const wordText = wordElement.textContent || wordElement.innerText || '';
-              const cleanWord = wordText.trim();
-              
-              if (cleanWord) {
-                await navigator.clipboard.writeText(cleanWord);
-                
-                // Visual feedback
-                const originalHTML = copyButton.innerHTML;
-                copyButton.innerHTML = `
-                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                  </svg>
-                `;
-                copyButton.style.color = '#4CAF50';
-                
-                setTimeout(() => {
-                  copyButton.innerHTML = originalHTML;
-                  copyButton.style.color = '';
-                }, 1500);
-              }
+
+          const wordElement = document.querySelector('.word');
+          let success = false;
+
+          if (wordElement) {
+            const wordText = wordElement.textContent || wordElement.innerText || '';
+            const cleanWord = wordText.trim();
+
+            if (cleanWord) {
+              success = await front_copyToClipboard(cleanWord);
             }
-            
-          } catch (error) {
+          }
+
+          if (success) {
+            // Visual feedback
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+              </svg>
+            `;
+            copyButton.style.color = '#4CAF50';
+
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          } else {
             // Visual feedback for error
             const originalHTML = copyButton.innerHTML;
             copyButton.innerHTML = `
@@ -99,7 +126,7 @@
               </svg>
             `;
             copyButton.style.color = '#f44336';
-            
+
             setTimeout(() => {
               copyButton.innerHTML = originalHTML;
               copyButton.style.color = '';
@@ -112,65 +139,65 @@
       function front_setupCopyCardButton() {
         const copyButton = document.querySelector('.copy-card-button');
         if (!copyButton) return;
-        
+
         copyButton.addEventListener('click', async (e) => {
           e.preventDefault();
-          
-          try {
-            const wordElement = document.querySelector('.word');
-            const exampleElements = document.querySelectorAll('.example-item');
-            
-            let lines = [];
-            
-            // Add word
-            if (wordElement) {
-              const wordText = wordElement.textContent || wordElement.innerText || '';
-              if (wordText.trim()) {
-                lines.push(`Word: ${wordText.trim()}`);
-                lines.push(''); // Empty line
-              }
+
+          const wordElement = document.querySelector('.word');
+          const exampleElements = document.querySelectorAll('.example-item');
+
+          let lines = [];
+
+          // Add word
+          if (wordElement) {
+            const wordText = wordElement.textContent || wordElement.innerText || '';
+            if (wordText.trim()) {
+              lines.push(`Word: ${wordText.trim()}`);
+              lines.push(''); // Empty line
             }
-            
-            // Add examples (front template shows examples only)
-            if (exampleElements.length > 0) {
-              lines.push('Examples:');
-              exampleElements.forEach((element, index) => {
-                const exampleText = element.textContent || element.innerText || '';
-                if (exampleText.trim()) {
-                  let cleanText = exampleText.trim();
-                  cleanText = cleanText.replace(/\[.*?\]/g, '');
-                  cleanText = cleanText.replace(/\s+/g, ' ');
-                  cleanText = cleanText.trim();
-                  
-                  if (cleanText) {
-                    lines.push(`${index + 1}. ${cleanText}`);
-                  }
+          }
+
+          // Add examples (front template shows examples only)
+          if (exampleElements.length > 0) {
+            lines.push('Examples:');
+            exampleElements.forEach((element, index) => {
+              const exampleText = element.textContent || element.innerText || '';
+              if (exampleText.trim()) {
+                let cleanText = exampleText.trim();
+                cleanText = cleanText.replace(/\[.*?\]/g, '');
+                cleanText = cleanText.replace(/\s+/g, ' ');
+                cleanText = cleanText.trim();
+
+                if (cleanText) {
+                  lines.push(`${index + 1}. ${cleanText}`);
                 }
-              });
-            }
-            
-            // Join with line breaks
-            const textToCopy = lines.join('\n');
-            
-            if (textToCopy.trim()) {
-              await navigator.clipboard.writeText(textToCopy);
-              
-              // Visual feedback
-              const originalHTML = copyButton.innerHTML;
-              copyButton.innerHTML = `
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-                </svg>
-              `;
-              copyButton.style.color = '#4CAF50';
-              
-              setTimeout(() => {
-                copyButton.innerHTML = originalHTML;
-                copyButton.style.color = '';
-              }, 1500);
-            }
-            
-          } catch (error) {
+              }
+            });
+          }
+
+          // Join with line breaks
+          const textToCopy = lines.join('\n');
+          let success = false;
+
+          if (textToCopy.trim()) {
+            success = await front_copyToClipboard(textToCopy);
+          }
+
+          if (success) {
+            // Visual feedback
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+              </svg>
+            `;
+            copyButton.style.color = '#4CAF50';
+
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          } else {
             // Visual feedback for error
             const originalHTML = copyButton.innerHTML;
             copyButton.innerHTML = `
@@ -179,7 +206,7 @@
               </svg>
             `;
             copyButton.style.color = '#f44336';
-            
+
             setTimeout(() => {
               copyButton.innerHTML = originalHTML;
               copyButton.style.color = '';
@@ -288,7 +315,7 @@
             if (word.endsWith("o") || word.endsWith("s") || word.endsWith("sh") || word.endsWith("ch") || word.endsWith("x") || word.endsWith("z")) {
               variations.add(word + "es");
             }
-            
+
             // Past participle variations
             if (word.endsWith("e")) {
               variations.add(word + "n");
@@ -588,41 +615,40 @@
       function front_processLevelBadge() {
         const levelBadge = document.querySelector('.level-badge');
         if (!levelBadge) return;
-        
+
         const tagsContent = levelBadge.textContent || levelBadge.innerText || '';
-        if (!tagsContent) {
+        if (!tagsContent.trim()) {
           levelBadge.style.display = 'none';
           return;
         }
-        
-        // Extract all levels from tags (A1, A2, B1, B2, C1, C2, duplicate)
-        const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'duplicate'];
-        const foundLevels = levels.filter(level => 
-          tagsContent.toLowerCase().includes(level.toLowerCase())
-        );
-        
+
+        // Extract all tags by splitting on whitespace
+        const foundLevels = tagsContent.trim().split(/\s+/).filter(tag => tag.length > 0);
+
         if (foundLevels.length === 0) {
           levelBadge.style.display = 'none';
           return;
         }
-        
+
         // Clear the original badge content
         levelBadge.innerHTML = '';
-        
+
         // Create individual badges for each found level
         foundLevels.forEach((level, index) => {
           const badge = document.createElement('span');
           badge.textContent = level.toUpperCase();
-          badge.className = `level-badge level-${level.toLowerCase()}`;
-          
+          // Use the tag name for the class, replacing special chars if needed for valid CSS class
+          const safeClass = level.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+          badge.className = `level-badge level-${safeClass}`;
+
           // Add some spacing between badges if there are multiple
           if (index > 0) {
             badge.style.marginLeft = '4px';
           }
-          
+
           levelBadge.appendChild(badge);
         });
-        
+
         // Remove the original level-badge class since we're using it as a container now
         levelBadge.className = 'level-badges-container';
       }

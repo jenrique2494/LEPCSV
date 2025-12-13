@@ -1,0 +1,399 @@
+<article class="card">
+  <!-- Card Header: Word Display -->
+  <header class="card-header">
+    <h1 class="word">{{Word}}</h1>
+    <div class="badges-container">
+      <span class="pos-badge {{^Part of Speech}}is-empty{{/Part of Speech}}">
+        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}}
+        {{^Part of Speech}}&nbsp;{{/Part of Speech}}
+      </span>
+      <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
+    </div>
+    <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Word}}</span>
+    <span class="example-audio">{{tts de_DE:Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Word}}</span>
+    <button class="copy-card-button" title="Copiar texto de la tarjeta">
+    </button>
+  </header>
+
+  <!-- Pronunciation and Audio -->
+  <section class="pronunciation-audio">
+    <span class="pronunciation">/{{Pronunciation/IPA}}/</span>
+  </section>
+
+  <!-- Grammar Information (if it exists) -->
+  {{#Grammar}}
+  <div class="grammar">{{Grammar}}</div>
+  {{/Grammar}}
+
+  <hr class="divider">
+
+  <!-- Definition Section -->
+  <section class="definition-section">
+    <h2 class="section-title">Definition</h2>
+    <div class="definition-content">{{Definition}}</div>
+  </section>
+
+  <hr class="divider">
+
+  <!-- Example Sentences Section -->
+  <section class="examples-section">
+    <h2 class="section-title">Examples</h2>
+    <ul class="examples-list">
+      {{#Example 1}}
+      <li class="example-sentence">
+        <span class="example-item">{{Example 1}}</span>
+      </li>
+      <li style="display: flex;">
+        <!--  -->
+        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Example 1}}</span>
+        <span class="example-audio">{{tts de_DE:Example 1}}</span>
+        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Example 1}}</span>
+      </li>
+      {{/Example 1}}
+      {{#Example 2}}
+      <li class="example-sentence">
+        <span class="example-item">{{Example 2}}</span>
+        
+      </li>
+      <li style="display: flex;">
+        <!--  -->
+        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Example 2}}</span>
+        <span class="example-audio">{{tts de_DE:Example 2}}</span>
+        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Example 2}}</span>
+      </li>
+      {{/Example 2}}
+      {{#Example 3}}
+      <li class="example-sentence">
+        <span class="example-item">{{Example 3}}</span>
+        
+      </li>
+      <li style="display: flex;">
+        <!--  -->
+        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Example 3}}</span>
+        <span class="example-audio">{{tts de_DE:Example 3}}</span>
+        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Example 3}}</span>
+      </li>
+      {{/Example 3}}
+    </ul>
+  </section>
+
+  <script>
+    (function() {
+
+      function front_cleanExampleSentenceForCoca(sentenceHTML) {
+        if (typeof sentenceHTML !== "string" || !sentenceHTML) return "";
+
+        let cleaned = sentenceHTML;
+
+        cleaned = cleaned.replace(/\[.*?\]/g, "");
+
+        const equalsIndex = cleaned.indexOf("=");
+        if (equalsIndex !== -1) {
+          cleaned = cleaned.substring(0, equalsIndex);
+        }
+
+        cleaned = cleaned.replace(/\s+/g, " ");
+        return cleaned.trim();
+      }
+
+      // Function to set up copy card button functionality
+      function front_setupCopyCardButton() {
+        const copyButton = document.querySelector('.copy-card-button');
+        if (!copyButton) {
+          return;
+        }
+        
+        copyButton.addEventListener('click', async (e) => {
+          e.preventDefault();
+          
+          try {
+            // Extract only the relevant text content (word, definition, examples)
+            const wordElement = document.querySelector('.word');
+            const exampleElements = document.querySelectorAll('.example-item');
+            
+            let textToCopy = '';
+            
+            // Add word
+            if (wordElement) {
+              const wordText = wordElement.textContent || wordElement.innerText || '';
+              if (wordText.trim()) {
+                textToCopy += `Word: ${wordText.trim()}\n\n`;
+              }
+            }
+            
+            // Add examples (front template shows examples only)
+            if (exampleElements.length > 0) {
+              textToCopy += 'Examples:\n';
+              exampleElements.forEach((element, index) => {
+                const exampleText = element.textContent || element.innerText || '';
+                if (exampleText.trim()) {
+                  // Clean up example text (remove extra whitespace, brackets, etc.)
+                  let cleanText = exampleText.trim();
+                  cleanText = cleanText.replace(/\[.*?\]/g, ''); // Remove bracketed content
+                  cleanText = cleanText.replace(/\s+/g, ' '); // Normalize whitespace
+                  cleanText = cleanText.trim();
+                  
+                  if (cleanText) {
+                    textToCopy += `${index + 1}. ${cleanText}\n`;
+                  }
+                }
+              });
+            }
+            
+            // Copy to clipboard
+            if (textToCopy.trim()) {
+              await navigator.clipboard.writeText(textToCopy.trim());
+              
+              // Visual feedback
+              const originalHTML = copyButton.innerHTML;
+              copyButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+              `;
+              copyButton.style.color = '#4CAF50';
+              
+              setTimeout(() => {
+                copyButton.innerHTML = originalHTML;
+                copyButton.style.color = '';
+              }, 1500);
+            }
+            
+          } catch (error) {
+            // Visual feedback for error
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            `;
+            copyButton.style.color = '#f44336';
+            
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          }
+        });
+      }
+
+      function front_highlightWordInExamples() {
+        const wordElement = document.querySelector(".word");
+        if (!wordElement) return;
+
+        const targetWord = wordElement.textContent || wordElement.innerText || "";
+        if (!targetWord) return;
+
+        const cleanWord = targetWord.toLowerCase().trim();
+        if (!cleanWord) return;
+
+        // Helpers
+        const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+        // Produce umlaut variants: a->ä, o->ö, u->ü and also ae->ä, oe->ö, ue->ü
+        const umlautVariants = (w) => {
+          const variants = new Set([w]);
+          if (w.includes('ae')) variants.add(w.replace(/ae/g, 'ä'));
+          if (w.includes('oe')) variants.add(w.replace(/oe/g, 'ö'));
+          if (w.includes('ue')) variants.add(w.replace(/ue/g, 'ü'));
+          if (w.includes('a')) variants.add(w.replace(/a/g, 'ä'));
+          if (w.includes('o')) variants.add(w.replace(/o/g, 'ö'));
+          if (w.includes('u')) variants.add(w.replace(/u/g, 'ü'));
+          return Array.from(variants);
+        };
+
+        const generateVariations = (word) => {
+          const variations = new Set();
+          const lower = word;
+          const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
+
+          variations.add(lower);
+          variations.add(capitalized);
+
+          // Base stem guesses for verbs (remove common infinitive endings)
+          let stem = lower;
+          if (stem.endsWith('en')) stem = stem.slice(0, -2);
+          else if (stem.endsWith('n')) stem = stem.slice(0, -1);
+
+          // Common German plural endings and genitive
+          const plurals = ['s', 'e', 'en', 'n', 'er', 'ern', 'es'];
+          plurals.forEach(p => {
+            variations.add(stem + p);
+            variations.add(lower + p);
+          });
+
+          // Diminutives
+          ['chen', 'lein'].forEach(d => {
+            variations.add(stem + d);
+            variations.add(lower + d);
+          });
+
+          // Adjective/noun endings (cases)
+          ['','e','en','em','er','es'].forEach(suffix => {
+            variations.add(lower + suffix);
+            variations.add(capitalized + suffix);
+          });
+
+          // Comparative / superlative
+          variations.add(lower + 'er');
+          variations.add(lower + 'ste');
+          variations.add(lower + 'sten');
+
+          // Verb conjugation common endings (ich/du/er/wir/ihr/sie)
+          ['e','st','t','en','t','en'].forEach(ending => variations.add(stem + ending));
+
+          // Past participle and simple past heuristic
+          variations.add('ge' + stem + 't');
+          variations.add('ge' + stem + 'en');
+          variations.add(stem + 'te');
+          variations.add(stem + 'te');
+
+          // Possessive/genitive short forms
+          variations.add(lower + 's');
+          variations.add(lower + 'es');
+
+          // Agent / nominalized forms
+          ['er','erin','ung','keit','heit','schaft','tum'].forEach(suf => variations.add(stem + suf));
+
+          // Add umlaut variants for reasonable matches
+          Array.from(variations).forEach(v => {
+            umlautVariants(v).forEach(u => variations.add(u));
+          });
+
+          // Add uppercase variants for sentence starts and nouns
+          const originals = Array.from(variations);
+          originals.forEach(v => {
+            if (v && v.length > 0) {
+              variations.add(v.charAt(0).toUpperCase() + v.slice(1));
+              variations.add(v.toUpperCase());
+            }
+          });
+
+          return Array.from(variations).filter(Boolean);
+        };
+
+        const wordVariations = generateVariations(cleanWord);
+
+        // Build safe regex patterns; use word boundaries but allow matching inside compounds optionally
+        const exactPattern = "\\b(" + wordVariations.map(v => escapeRegex(v)).join("|") + ")\\b";
+        const exactRegex = new RegExp(exactPattern, "gi");
+
+        const partialPattern = "(" + wordVariations.map(v => escapeRegex(v)).join("|") + ")";
+        const partialRegex = new RegExp(partialPattern, "gi");
+
+        document.querySelectorAll('.example-item').forEach((item) => {
+          const originalHTML = item.innerHTML;
+
+          // Skip if already contains <em> and try to preserve existing highlights
+          if (item.querySelector('em')) {
+            const emTags = [];
+            let tempHTML = originalHTML.replace(/<em[^>]*>.*?<\/em>/gi, (match) => {
+              const placeholder = `__EM_PLACEHOLDER_${emTags.length}__`;
+              emTags.push(match);
+              return placeholder;
+            });
+
+            tempHTML = tempHTML.replace(exactRegex, '<em>$1</em>');
+
+            emTags.forEach((tag, index) => {
+              tempHTML = tempHTML.replace(`__EM_PLACEHOLDER_${index}__`, tag);
+            });
+
+            if (originalHTML !== tempHTML) item.innerHTML = tempHTML;
+          } else {
+            // Try exact word-boundary matches first
+            let highlightedHTML = originalHTML.replace(exactRegex, '<em>$1</em>');
+
+            // If no exact matches, try partial/compound matching but avoid very short matches
+            if (originalHTML === highlightedHTML) {
+              const textContent = (item.textContent || item.innerText || '').toLowerCase();
+              const words = textContent.split(/\s+/);
+              const hasCompoundMatch = words.some(w =>
+                wordVariations.some(variant => variant.length >= 3 && w.includes(variant) && w !== variant && w.length > variant.length + 1)
+              );
+
+              if (hasCompoundMatch) {
+                highlightedHTML = originalHTML.replace(partialRegex, '<em>$1</em>');
+              }
+            }
+
+            if (originalHTML !== highlightedHTML) item.innerHTML = highlightedHTML;
+          }
+        });
+      }
+
+      function front_processLevelBadge() {
+        const levelBadge = document.querySelector('.level-badge');
+        if (!levelBadge) return;
+        
+        const tagsContent = levelBadge.textContent || levelBadge.innerText || '';
+        if (!tagsContent) {
+          levelBadge.style.display = 'none';
+          return;
+        }
+        
+        // Extract all levels from tags (A1, A2, B1, B2, C1, C2, duplicate)
+        const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'duplicate'];
+        const foundLevels = levels.filter(level => 
+          tagsContent.toLowerCase().includes(level.toLowerCase())
+        );
+        
+        if (foundLevels.length === 0) {
+          levelBadge.style.display = 'none';
+          return;
+        }
+        
+        // Clear the original badge content
+        levelBadge.innerHTML = '';
+        
+        // Create individual badges for each found level
+        foundLevels.forEach((level, index) => {
+          const badge = document.createElement('span');
+          badge.textContent = level.toUpperCase();
+          badge.className = `level-badge level-${level.toLowerCase()}`;
+          
+          // Add some spacing between badges if there are multiple
+          if (index > 0) {
+            badge.style.marginLeft = '4px';
+          }
+          
+          levelBadge.appendChild(badge);
+        });
+        
+        // Remove the original level-badge class since we're using it as a container now
+        levelBadge.className = 'level-badges-container';
+      }
+
+      function front_applyCocaExampleCleaning() {
+        const exampleItems = document.querySelectorAll(
+          "article.card .examples-section .example-item"
+        );
+        exampleItems.forEach((item) => {
+          if (item.innerHTML) {
+            const originalHTML = item.innerHTML;
+            const cleanedHTML = front_cleanExampleSentenceForCoca(originalHTML);
+            if (originalHTML !== cleanedHTML) {
+              item.innerHTML = cleanedHTML;
+            }
+          }
+        });
+      }
+
+
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+          front_setupCopyCardButton();
+          front_processLevelBadge();
+          front_applyCocaExampleCleaning();
+          front_highlightWordInExamples();
+        });
+      } else {
+        front_setupCopyCardButton();
+        front_processLevelBadge();
+        front_applyCocaExampleCleaning();
+        front_highlightWordInExamples();
+      }
+    })();
+  </script>
+</article>

@@ -2,84 +2,62 @@
 
 Sistema para clasificar palabras y frases en inglés según el Marco Común Europeo de Referencia (CEFR) usando análisis léxico y gramatical.
 
-## ⚡ Comandos Rápidos
-
-```bash
-# Procesar tu archivo (archivo.txt o LR.txt)
-python cerf_local.py --file "archivo.txt"
-
-# Clasificar una palabra
-python cerf_local.py --word "beautiful"
-
-# Clasificar una frase
-python cerf_local.py --text "This is a beautiful day"
-
-# Modo interactivo
-python cerf_local.py
-```
-
-**Resultado:** Se genera automáticamente `archivo_CEFR_local.txt` con los niveles CEFR agregados en la columna 15.
-
 ## 📋 Versiones Disponibles
 
-### 1. **cerf_simple.py** (BÁSICO)
-- ✅ Análisis heurístico simple
+### 1. **cerf_simple.py** (RECOMENDADO para empezar)
+- ✅ **Funciona sin dependencias complejas**
+- 📏 Usa análisis heurístico cuando no hay dependencias
+- 🚀 Fácil de ejecutar
 - 📄 Procesa archivos TSV
-- 🚀 Fácil de usar
 
-### 2. **cerf_local.py** (RECOMENDADO - AVANZADO)
-- 🤖 Modelo neural `cefr_classifier_model_final`
-- 📚 Análisis léxico (cefrpy) + Análisis gramatical (transformers)
-- ⚖️ Lógica de "Ancla Dominante" para resultados más precisos
-- 🔧 Requiere PyTorch, transformers, spaCy
-- ✅ **OPCIÓN RECOMENDADA PARA MÁXIMA PRECISIÓN**
+### 2. **cerf_local.py** (AVANZADO)
+- 🤖 Requiere modelo neural `cefr_classifier_model_final`
+- 📚 Combina análisis léxico (cefrpy) + gramatical (transformers)
+- ⚖️ Usa lógica de "Ancla Dominante"
+- 🔧 Requiere más dependencias
 
 ## 🚀 Inicio Rápido
 
-### Instalación de Dependencias
+### Opción 1: Ejecución Simple (Sin instalaciones)
 ```bash
-# Dependencias básicas para cerf_local.py
-pip install cefrpy spacy transformers torch
-
-# Descargar modelo de spaCy
-python -m spacy download en_core_web_sm
+python cerf_simple.py
 ```
 
-### Primer Uso
+### Opción 2: Con Dependencias Completas
 ```bash
-# Modo interactivo
-python cerf_local.py
+# Instalar dependencias
+pip install cefrpy spacy
+python -m spacy download en_core_web_sm
 
-# O procesar un archivo directamente
-python cerf_local.py --file "LR.txt"
+# Ejecutar
+python cerf_simple.py
 ```
 
 ## 💡 Uso
 
 ### 📝 Clasificar una palabra
 ```bash
-python cerf_local.py --word "beautiful"
+python cerf_simple.py --word "beautiful"
 ```
 
 ### 📖 Clasificar una frase
 ```bash
-python cerf_local.py --text "This is a beautiful day"
+python cerf_simple.py --text "This is a beautiful day"
 ```
 
 ### 📄 Procesar archivo TSV
 ```bash
 # Procesar todo el archivo
-python cerf_local.py --file "LR.txt"
+python cerf_simple.py --file "tu_archivo.txt"
 
 # Procesar solo las primeras 10 líneas (para pruebas)
-python cerf_local.py --file "LR.txt" --max-lines 10
+python cerf_simple.py --file "tu_archivo.txt" --max-lines 10
 ```
 
 ### 💬 Modo interactivo
 ```bash
-python cerf_local.py
+python cerf_simple.py
 # Luego escribe palabras o frases cuando te lo pida
-# O escribe: file:LR.txt para procesar un archivo
 ```
 
 ## 📊 Niveles CEFR
@@ -115,45 +93,6 @@ pip install torch transformers
 ├── cefr_classifier_model_final/# 📦 Tu modelo entrenado (si lo tienes)
 ├── 4000EEnglish__1.Book copy.txt # 📄 Tu archivo a procesar
 └── install_deps.bat            # 🛠️ Script de instalación
-```
-
-## 📁 Formato de Archivos de Entrada
-
-### Archivos TSV (Tabulación separada)
-El clasificador procesa archivos `.txt` con formato TSV:
-
-**Estructura esperada:**
-```
-Col 1      Col 2      Col 3      Col 4 (PALABRA)    ...    Col 15 (TAGS)
-guid       notetype   deck       palabra           ...    tags_existentes
-```
-
-**Características:**
-- Delimitador: TAB (`\t`)
-- Primera línea: Líneas de comentario que comienzan con `#`
-- Columna 4 (índice 3): Contiene la palabra o frase a clasificar
-- Columna 15 (índice 14): Donde se agregan los tags CEFR
-
-**Ejemplo de entrada:**
-```
-#separator:tab
-#html:true
-#guid column:1
-#tags column:15
-yTn}SjH`!h	JPCARDS	LR::00000-1000	be	...	LR::0-1000
-jxP(Y*n%:x	JPCARDS	LR::00000-1000	the	...	LR::0-1000
-```
-
-**Ejemplo de salida (después del procesamiento):**
-```
-yTn}SjH`!h	JPCARDS	LR::00000-1000	be	...	LR::0-1000 A1
-jxP(Y*n%:x	JPCARDS	LR::00000-1000	the	...	LR::0-1000 A1
-```
-
-### Archivos generados
-Cuando procesas un archivo `archivo.txt`, se genera automáticamente:
-```
-archivo_CEFR_local.txt    (Con los niveles CEFR agregados)
 ```
 
 ## 🎯 Ejemplos de Resultados

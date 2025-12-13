@@ -1,0 +1,13 @@
+{
+  "name": "lepcsv-cefr-processor",
+  "version": "1.0.0",
+  "description": "Script para agregar niveles CEFR a palabras en archivos TSV de Anki usando la API de vocabkitchen.com",
+  "main": "add_cefr_levels.js",
+  "scripts": {
+    "start": "node add_cefr_levels.js",
+    "process": "node add_cefr_levels.js"
+  },
+  "keywords": ["cefr", "anki", "vocabulary", "english", "tsv"],
+  "author": "",
+  "license": "MIT"
+}

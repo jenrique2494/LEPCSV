@@ -1,0 +1,663 @@
+<article class="card">
+  <!-- Card Header: Word Display -->
+  <header class="card-header">
+    <h1 class="word">{{Word}}</h1>
+    <div class="badges-container">
+      <span class="pos-badge {{^Part of Speech}}is-empty{{/Part of Speech}}">
+        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}} 
+        {{^Part of Speech}}&nbsp;{{/Part of Speech}}
+      </span>
+      <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
+    </div>
+    <span class="example-audio">{{tts en_GB voices=com.google.android.tts-en-GB-language:Word}}</span>
+    <span class="example-audio">{{tts en_AU voices=com.google.android.tts-en-au-x-aud-network:Word}}</span>
+    <span class="example-audio">{{tts en_US voices=com.google.android.tts-en-us-x-iol-network:Word}}</span>
+    <button class="copy-word-button" title="Copiar palabra"></button>
+    <button class="copy-card-button" title="Copiar texto completo"></button>
+  </header>
+
+  <!-- Pronunciation and Audio -->
+  <section class="pronunciation-audio">
+    <span class="pronunciation">/{{Pronunciation/IPA}}/</span>
+  </section>
+
+  <hr class="divider" />
+
+  <!-- Example Sentences Section -->
+  <section class="examples-section">
+    <h2 class="section-title">Examples</h2>
+    <ul class="examples-list">
+      {{#Example 1}}
+      <li class="example-item">{{Example 1}}</li>
+      {{/Example 1}} {{#Example 2}}
+      <li class="example-item">{{Example 2}}</li>
+      {{/Example 2}} {{#Example 3}}
+      <li class="example-item">{{Example 3}}</li>
+      {{/Example 3}}
+    </ul>
+  </section>
+
+  <script>
+    (function() {
+
+      function front_cleanExampleSentenceForCoca(sentenceHTML) {
+        if (typeof sentenceHTML !== "string" || !sentenceHTML) return "";
+
+        let cleaned = sentenceHTML;
+
+        cleaned = cleaned.replace(/\[.*?\]/g, "");
+
+        const equalsIndex = cleaned.indexOf("=");
+        if (equalsIndex !== -1) {
+          cleaned = cleaned.substring(0, equalsIndex);
+        }
+
+        cleaned = cleaned.replace(/\s+/g, " ");
+        return cleaned.trim();
+      }
+
+      // Function to set up copy word button functionality
+      function front_setupCopyWordButton() {
+        const copyButton = document.querySelector('.copy-word-button');
+        if (!copyButton) return;
+        
+        copyButton.addEventListener('click', async (e) => {
+          e.preventDefault();
+          
+          try {
+            const wordElement = document.querySelector('.word');
+            
+            if (wordElement) {
+              const wordText = wordElement.textContent || wordElement.innerText || '';
+              const cleanWord = wordText.trim();
+              
+              if (cleanWord) {
+                await navigator.clipboard.writeText(cleanWord);
+                
+                // Visual feedback
+                const originalHTML = copyButton.innerHTML;
+                copyButton.innerHTML = `
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                    <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                  </svg>
+                `;
+                copyButton.style.color = '#4CAF50';
+                
+                setTimeout(() => {
+                  copyButton.innerHTML = originalHTML;
+                  copyButton.style.color = '';
+                }, 1500);
+              }
+            }
+            
+          } catch (error) {
+            // Visual feedback for error
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            `;
+            copyButton.style.color = '#f44336';
+            
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          }
+        });
+      }
+
+      // Function to set up copy card button functionality
+      function front_setupCopyCardButton() {
+        const copyButton = document.querySelector('.copy-card-button');
+        if (!copyButton) return;
+        
+        copyButton.addEventListener('click', async (e) => {
+          e.preventDefault();
+          
+          try {
+            const wordElement = document.querySelector('.word');
+            const exampleElements = document.querySelectorAll('.example-item');
+            
+            let lines = [];
+            
+            // Add word
+            if (wordElement) {
+              const wordText = wordElement.textContent || wordElement.innerText || '';
+              if (wordText.trim()) {
+                lines.push(`Word: ${wordText.trim()}`);
+                lines.push(''); // Empty line
+              }
+            }
+            
+            // Add examples (front template shows examples only)
+            if (exampleElements.length > 0) {
+              lines.push('Examples:');
+              exampleElements.forEach((element, index) => {
+                const exampleText = element.textContent || element.innerText || '';
+                if (exampleText.trim()) {
+                  let cleanText = exampleText.trim();
+                  cleanText = cleanText.replace(/\[.*?\]/g, '');
+                  cleanText = cleanText.replace(/\s+/g, ' ');
+                  cleanText = cleanText.trim();
+                  
+                  if (cleanText) {
+                    lines.push(`${index + 1}. ${cleanText}`);
+                  }
+                }
+              });
+            }
+            
+            // Join with line breaks
+            const textToCopy = lines.join('\n');
+            
+            if (textToCopy.trim()) {
+              await navigator.clipboard.writeText(textToCopy);
+              
+              // Visual feedback
+              const originalHTML = copyButton.innerHTML;
+              copyButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+              `;
+              copyButton.style.color = '#4CAF50';
+              
+              setTimeout(() => {
+                copyButton.innerHTML = originalHTML;
+                copyButton.style.color = '';
+              }, 1500);
+            }
+            
+          } catch (error) {
+            // Visual feedback for error
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            `;
+            copyButton.style.color = '#f44336';
+            
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          }
+        });
+      }
+
+      function front_highlightWordInExamples() {
+        const wordElement = document.querySelector(".word");
+        if (!wordElement) return;
+
+        const targetWord = wordElement.textContent || wordElement.innerText || "";
+        if (!targetWord) return;
+
+        const cleanWord = targetWord.toLowerCase().trim();
+        if (!cleanWord) return;
+
+        const generateVariations = (word) => {
+          const variations = new Set([word]);
+
+          // Basic plurals and verb forms
+          if (
+            word.endsWith("y") &&
+            word.length > 2 &&
+            !"aeiou".includes(word[word.length - 2])
+          ) {
+            variations.add(word.slice(0, -1) + "ies");
+            variations.add(word.slice(0, -1) + "ied");
+            variations.add(word.slice(0, -1) + "ying");
+            variations.add(word.slice(0, -1) + "er");
+            variations.add(word.slice(0, -1) + "est");
+            variations.add(word.slice(0, -1) + "ily");
+          } else if (
+            word.endsWith("s") ||
+            word.endsWith("sh") ||
+            word.endsWith("ch") ||
+            word.endsWith("x") ||
+            word.endsWith("z")
+          ) {
+            variations.add(word + "es");
+          } else {
+            variations.add(word + "s");
+          }
+
+          // Past tense, gerund, and comparative forms
+          if (word.endsWith("e")) {
+            variations.add(word + "d");
+            variations.add(word + "r");
+            variations.add(word + "rs");
+            variations.add(word + "st");
+            variations.add(word.slice(0, -1) + "ing");
+            variations.add(word.slice(0, -1) + "ely");
+            variations.add(word.slice(0, -1) + "ness");
+          } else {
+            variations.add(word + "ed");
+            variations.add(word + "er");
+            variations.add(word + "ers");
+            variations.add(word + "est");
+            variations.add(word + "ing");
+            variations.add(word + "ly");
+            variations.add(word + "ness");
+            variations.add(word + "ment");
+            variations.add(word + "ful");
+            variations.add(word + "less");
+
+            // Double consonant rules
+            if (
+              word.length >= 3 &&
+              !"aeiou".includes(word[word.length - 1]) &&
+              "aeiou".includes(word[word.length - 2]) &&
+              !"aeiouwxy".includes(word[word.length - 1])
+            ) {
+              const lastChar = word[word.length - 1];
+              variations.add(word + lastChar + "ing");
+              variations.add(word + lastChar + "ed");
+              variations.add(word + lastChar + "er");
+              variations.add(word + lastChar + "est");
+            }
+          }
+
+          // Adverb forms from adjectives
+          if (word.endsWith("ic")) {
+            variations.add(word + "ally");
+          } else if (word.endsWith("le")) {
+            variations.add(word.slice(0, -2) + "ly");
+          } else if (word.endsWith("ful")) {
+            variations.add(word + "ly");
+          } else if (word.endsWith("al")) {
+            variations.add(word + "ly");
+          }
+
+          // Negative prefixes
+          variations.add("un" + word);
+          variations.add("in" + word);
+          variations.add("im" + word);
+          variations.add("ir" + word);
+          variations.add("il" + word);
+          variations.add("dis" + word);
+          variations.add("mis" + word);
+          variations.add("non" + word);
+
+          // Additional verb forms
+          if (word.length > 3) {
+            // Third person singular present
+            if (word.endsWith("o") || word.endsWith("s") || word.endsWith("sh") || word.endsWith("ch") || word.endsWith("x") || word.endsWith("z")) {
+              variations.add(word + "es");
+            }
+            
+            // Past participle variations
+            if (word.endsWith("e")) {
+              variations.add(word + "n");
+            } else {
+              variations.add(word + "en");
+            }
+          }
+
+          // Noun forms
+          variations.add(word + "ion");
+          variations.add(word + "tion");
+          variations.add(word + "sion");
+          variations.add(word + "ation");
+          variations.add(word + "ness");
+          variations.add(word + "ity");
+          variations.add(word + "ability");
+          variations.add(word + "ment");
+          variations.add(word + "ance");
+          variations.add(word + "ence");
+
+          // Agent nouns
+          variations.add(word + "er");
+          variations.add(word + "or");
+          variations.add(word + "ist");
+          variations.add(word + "ian");
+
+          // Adjective forms
+          variations.add(word + "ive");
+          variations.add(word + "ous");
+          variations.add(word + "al");
+          variations.add(word + "ic");
+          variations.add(word + "able");
+          variations.add(word + "ible");
+
+          // Irregular forms handling (add common ones)
+          const irregularForms = {
+            be: ["am", "is", "are", "was", "were", "been", "being"],
+            have: ["has", "had", "having"],
+            do: ["does", "did", "done", "doing"],
+            go: ["goes", "went", "gone", "going"],
+            get: ["gets", "got", "gotten", "getting"],
+            make: ["makes", "made", "making"],
+            take: ["takes", "took", "taken", "taking"],
+            come: ["comes", "came", "coming"],
+            see: ["sees", "saw", "seen", "seeing"],
+            know: ["knows", "knew", "known", "knowing"],
+            think: ["thinks", "thought", "thinking"],
+            say: ["says", "said", "saying"],
+            tell: ["tells", "told", "telling"],
+            find: ["finds", "found", "finding"],
+            give: ["gives", "gave", "given", "giving"],
+            work: ["works", "worked", "working"],
+            call: ["calls", "called", "calling"],
+            try: ["tries", "tried", "trying"],
+            ask: ["asks", "asked", "asking"],
+            need: ["needs", "needed", "needing"],
+            feel: ["feels", "felt", "feeling"],
+            become: ["becomes", "became", "becoming"],
+            leave: ["leaves", "left", "leaving"],
+            put: ["puts", "putting"],
+            mean: ["means", "meant", "meaning"],
+            keep: ["keeps", "kept", "keeping"],
+            let: ["lets", "letting"],
+            begin: ["begins", "began", "begun", "beginning"],
+            seem: ["seems", "seemed", "seeming"],
+            help: ["helps", "helped", "helping"],
+            show: ["shows", "showed", "shown", "showing"],
+            hear: ["hears", "heard", "hearing"],
+            play: ["plays", "played", "playing"],
+            run: ["runs", "ran", "running"],
+            move: ["moves", "moved", "moving"],
+            live: ["lives", "lived", "living"],
+            believe: ["believes", "believed", "believing"],
+            hold: ["holds", "held", "holding"],
+            bring: ["brings", "brought", "bringing"],
+            happen: ["happens", "happened", "happening"],
+            write: ["writes", "wrote", "written", "writing"],
+            sit: ["sits", "sat", "sitting"],
+            stand: ["stands", "stood", "standing"],
+            lose: ["loses", "lost", "losing"],
+            pay: ["pays", "paid", "paying"],
+            meet: ["meets", "met", "meeting"],
+            include: ["includes", "included", "including"],
+            continue: ["continues", "continued", "continuing"],
+            set: ["sets", "setting"],
+            learn: ["learns", "learned", "learnt", "learning"],
+            change: ["changes", "changed", "changing"],
+            lead: ["leads", "led", "leading"],
+            understand: ["understands", "understood", "understanding"],
+            watch: ["watches", "watched", "watching"],
+            follow: ["follows", "followed", "following"],
+            stop: ["stops", "stopped", "stopping"],
+            create: ["creates", "created", "creating"],
+            speak: ["speaks", "spoke", "spoken", "speaking"],
+            read: ["reads", "reading"], // 'read' past tense is same spelling
+            spend: ["spends", "spent", "spending"],
+            grow: ["grows", "grew", "grown", "growing"],
+            open: ["opens", "opened", "opening"],
+            walk: ["walks", "walked", "walking"],
+            win: ["wins", "won", "winning"],
+            teach: ["teaches", "taught", "teaching"],
+            offer: ["offers", "offered", "offering"],
+            remember: ["remembers", "remembered", "remembering"],
+            consider: ["considers", "considered", "considering"],
+            appear: ["appears", "appeared", "appearing"],
+            buy: ["buys", "bought", "buying"],
+            serve: ["serves", "served", "serving"],
+            die: ["dies", "died", "dying"],
+            send: ["sends", "sent", "sending"],
+            build: ["builds", "built", "building"],
+            stay: ["stays", "stayed", "staying"],
+            fall: ["falls", "fell", "fallen", "falling"],
+            cut: ["cuts", "cutting"],
+            reach: ["reaches", "reached", "reaching"],
+            kill: ["kills", "killed", "killing"],
+            raise: ["raises", "raised", "raising"],
+            pass: ["passes", "passed", "passing"],
+            sell: ["sells", "sold", "selling"],
+            decide: ["decides", "decided", "deciding"],
+            return: ["returns", "returned", "returning"],
+            explain: ["explains", "explained", "explaining"],
+            hope: ["hopes", "hoped", "hoping"],
+            develop: ["develops", "developed", "developing"],
+            carry: ["carries", "carried", "carrying"],
+            break: ["breaks", "broke", "broken", "breaking"],
+            receive: ["receives", "received", "receiving"],
+            agree: ["agrees", "agreed", "agreeing"],
+            support: ["supports", "supported", "supporting"],
+            hit: ["hits", "hitting"],
+            produce: ["produces", "produced", "producing"],
+            eat: ["eats", "ate", "eaten", "eating"],
+            cover: ["covers", "covered", "covering"],
+            catch: ["catches", "caught", "catching"],
+            draw: ["draws", "drew", "drawn", "drawing"],
+            choose: ["chooses", "chose", "chosen", "choosing"],
+            cause: ["causes", "caused", "causing"],
+            point: ["points", "pointed", "pointing"],
+            plan: ["plans", "planned", "planning"],
+            expect: ["expects", "expected", "expecting"],
+            pick: ["picks", "picked", "picking"],
+            remain: ["remains", "remained", "remaining"],
+            suggest: ["suggests", "suggested", "suggesting"],
+            push: ["pushes", "pushed", "pushing"],
+            pull: ["pulls", "pulled", "pulling"],
+            drop: ["drops", "dropped", "dropping"],
+            count: ["counts", "counted", "counting"],
+            add: ["adds", "added", "adding"],
+            save: ["saves", "saved", "saving"],
+            join: ["joins", "joined", "joining"],
+            reduce: ["reduces", "reduced", "reducing"],
+            establish: ["establishes", "established", "establishing"],
+            remove: ["removes", "removed", "removing"],
+            close: ["closes", "closed", "closing"],
+            answer: ["answers", "answered", "answering"],
+            allow: ["allows", "allowed", "allowing"],
+            control: ["controls", "controlled", "controlling"],
+            rise: ["rises", "rose", "risen", "rising"],
+            result: ["results", "resulted", "resulting"],
+            apply: ["applies", "applied", "applying"],
+            end: ["ends", "ended", "ending"],
+            protect: ["protects", "protected", "protecting"],
+            require: ["requires", "required", "requiring"],
+            general: ["generally"],
+            public: ["publicly"],
+            social: ["socially"],
+            economic: ["economically"],
+            political: ["politically"],
+            international: ["internationally"],
+            national: ["nationally"],
+            local: ["locally"],
+            personal: ["personally"],
+            special: ["specially"],
+            medical: ["medically"],
+            legal: ["legally"],
+            financial: ["financially"],
+            physical: ["physically"],
+            natural: ["naturally"],
+            human: ["humanly"],
+            real: ["really"],
+            possible: ["possibly"],
+            available: ["availability"],
+            important: ["importantly"],
+            different: ["differently"],
+            small: ["smaller", "smallest"],
+            large: ["larger", "largest"],
+            great: ["greater", "greatest"],
+            high: ["higher", "highest"],
+            low: ["lower", "lowest"],
+            long: ["longer", "longest"],
+            short: ["shorter", "shortest"],
+            new: ["newer", "newest"],
+            old: ["older", "oldest"],
+            young: ["younger", "youngest"],
+            good: ["better", "best"],
+            bad: ["worse", "worst"],
+            big: ["bigger", "biggest"],
+            little: ["less", "least"],
+            many: ["more", "most"],
+            much: ["more", "most"],
+            few: ["fewer", "fewest"],
+            far: ["farther", "farthest", "further", "furthest"],
+          };
+
+          if (irregularForms[word]) {
+            irregularForms[word].forEach((form) => variations.add(form));
+          }
+
+          // Add capitalized versions
+          const originalVariations = Array.from(variations);
+          originalVariations.forEach((variant) => {
+            variations.add(variant.charAt(0).toUpperCase() + variant.slice(1));
+            variations.add(variant.toUpperCase());
+          });
+
+          return Array.from(variations);
+        };
+
+        const wordVariations = generateVariations(cleanWord);
+
+        // Create more flexible regex patterns
+        const exactPattern =
+          "\\b(" +
+          wordVariations
+            .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("|") +
+          ")\\b";
+        const exactRegex = new RegExp(exactPattern, "gi");
+
+        // Optional: Add pattern for partial matches within compound words
+        const partialPattern =
+          "(" +
+          wordVariations
+            .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .join("|") +
+          ")";
+        const partialRegex = new RegExp(partialPattern, "gi");
+
+        document.querySelectorAll(".example-item").forEach((item) => {
+          const originalHTML = item.innerHTML;
+
+          // Skip if already processed
+          if (item.querySelector("em")) {
+            // Preserve existing highlights and add new ones
+            const emTags = [];
+            let tempHTML = originalHTML.replace(
+              /<em[^>]*>.*?<\/em>/gi,
+              (match) => {
+                const placeholder = `__EM_PLACEHOLDER_${emTags.length}__`;
+                emTags.push(match);
+                return placeholder;
+              }
+            );
+
+            // Apply highlighting to non-highlighted text
+            tempHTML = tempHTML.replace(exactRegex, "<em>$1</em>");
+
+            // Restore original em tags
+            emTags.forEach((tag, index) => {
+              tempHTML = tempHTML.replace(`__EM_PLACEHOLDER_${index}__`, tag);
+            });
+
+            if (originalHTML !== tempHTML) {
+              item.innerHTML = tempHTML;
+            }
+          } else {
+            // Apply highlighting to fresh text
+            let highlightedHTML = originalHTML.replace(exactRegex, "<em>$1</em>");
+
+            // If no exact matches found, try partial matching for compound words
+            if (originalHTML === highlightedHTML) {
+              const textContent = item.textContent || item.innerText || "";
+              const words = textContent.toLowerCase().split(/\s+/);
+              const hasCompoundMatch = words.some((word) =>
+                wordVariations.some(
+                  (variant) =>
+                    word.includes(variant) &&
+                    word !== variant &&
+                    word.length > variant.length + 2
+                )
+              );
+
+              if (hasCompoundMatch) {
+                highlightedHTML = originalHTML.replace(
+                  partialRegex,
+                  "<em>$1</em>"
+                );
+              }
+            }
+
+            if (originalHTML !== highlightedHTML) {
+              item.innerHTML = highlightedHTML;
+            }
+          }
+        });
+      }
+
+      function front_processLevelBadge() {
+        const levelBadge = document.querySelector('.level-badge');
+        if (!levelBadge) return;
+        
+        const tagsContent = levelBadge.textContent || levelBadge.innerText || '';
+        if (!tagsContent) {
+          levelBadge.style.display = 'none';
+          return;
+        }
+        
+        // Extract all levels from tags (A1, A2, B1, B2, C1, C2, duplicate)
+        const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'duplicate'];
+        const foundLevels = levels.filter(level => 
+          tagsContent.toLowerCase().includes(level.toLowerCase())
+        );
+        
+        if (foundLevels.length === 0) {
+          levelBadge.style.display = 'none';
+          return;
+        }
+        
+        // Clear the original badge content
+        levelBadge.innerHTML = '';
+        
+        // Create individual badges for each found level
+        foundLevels.forEach((level, index) => {
+          const badge = document.createElement('span');
+          badge.textContent = level.toUpperCase();
+          badge.className = `level-badge level-${level.toLowerCase()}`;
+          
+          // Add some spacing between badges if there are multiple
+          if (index > 0) {
+            badge.style.marginLeft = '4px';
+          }
+          
+          levelBadge.appendChild(badge);
+        });
+        
+        // Remove the original level-badge class since we're using it as a container now
+        levelBadge.className = 'level-badges-container';
+      }
+
+      function front_applyCocaExampleCleaning() {
+        const exampleItems = document.querySelectorAll(
+          "article.card .examples-section .example-item"
+        );
+        exampleItems.forEach((item) => {
+          if (item.innerHTML) {
+            const originalHTML = item.innerHTML;
+            const cleanedHTML = front_cleanExampleSentenceForCoca(originalHTML);
+            if (originalHTML !== cleanedHTML) {
+              item.innerHTML = cleanedHTML;
+            }
+          }
+        });
+      }
+
+      // Initialize on DOM ready
+      if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", function () {
+          front_setupCopyWordButton();
+          front_setupCopyCardButton();
+          front_processLevelBadge();
+          front_applyCocaExampleCleaning();
+          front_highlightWordInExamples();
+        });
+      } else {
+        front_setupCopyWordButton();
+        front_setupCopyCardButton();
+        front_processLevelBadge();
+        front_applyCocaExampleCleaning();
+        front_highlightWordInExamples();
+      }
+    })();
+  </script>
+</article>

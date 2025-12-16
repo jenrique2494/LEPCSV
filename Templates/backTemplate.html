@@ -83,33 +83,6 @@
 <script>
   (function () {
 
-    async function back_copyToClipboard(text) {
-      if (!text) return false;
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          return true;
-        }
-        throw new Error("Clipboard API unavailable");
-      } catch (err) {
-        try {
-          const textArea = document.createElement("textarea");
-          textArea.value = text;
-          textArea.style.position = "fixed";
-          textArea.style.left = "-9999px";
-          textArea.style.top = "0";
-          document.body.appendChild(textArea);
-          textArea.focus();
-          textArea.select();
-          const successful = document.execCommand("copy");
-          document.body.removeChild(textArea);
-          return successful;
-        } catch (fallbackErr) {
-          return false;
-        }
-      }
-    }
-
     function back_processLevelBadge() {
       const levelBadge = document.querySelector('.level-badge');
       if (!levelBadge) return;
@@ -166,33 +139,33 @@
       copyButton.addEventListener('click', async (e) => {
         e.preventDefault();
         
-        const wordElement = document.querySelector('.word');
-        let success = false;
-
-        if (wordElement) {
-          const wordText = wordElement.textContent || wordElement.innerText || '';
-          const cleanWord = wordText.trim();
+        try {
+          const wordElement = document.querySelector('.word');
           
-          if (cleanWord) {
-            success = await back_copyToClipboard(cleanWord);
+          if (wordElement) {
+            const wordText = wordElement.textContent || wordElement.innerText || '';
+            const cleanWord = wordText.trim();
+            
+            if (cleanWord) {
+              await navigator.clipboard.writeText(cleanWord);
+              
+              // Visual feedback
+              const originalHTML = copyButton.innerHTML;
+              copyButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+              `;
+              copyButton.style.color = '#4CAF50';
+              
+              setTimeout(() => {
+                copyButton.innerHTML = originalHTML;
+                copyButton.style.color = '';
+              }, 1500);
+            }
           }
-        }
-        
-        if (success) {
-          // Visual feedback
-          const originalHTML = copyButton.innerHTML;
-          copyButton.innerHTML = `
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-              <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-            </svg>
-          `;
-          copyButton.style.color = '#4CAF50';
           
-          setTimeout(() => {
-            copyButton.innerHTML = originalHTML;
-            copyButton.style.color = '';
-          }, 1500);
-        } else {
+        } catch (error) {
           // Visual feedback for error
           const originalHTML = copyButton.innerHTML;
           copyButton.innerHTML = `
@@ -218,68 +191,67 @@
       copyButton.addEventListener('click', async (e) => {
         e.preventDefault();
 
-        const wordElement = document.querySelector('.word');
-        const definitionElement = document.querySelector('.definition-content');
-        const exampleElements = document.querySelectorAll('.example-item');
+        try {
+          const wordElement = document.querySelector('.word');
+          const definitionElement = document.querySelector('.definition-content');
+          const exampleElements = document.querySelectorAll('.example-item');
 
-        let textToCopy = '';
+          let textToCopy = '';
 
-        // Add word
-        if (wordElement) {
-          const wordText = wordElement.textContent || wordElement.innerText || '';
-          if (wordText.trim()) {
-            textToCopy += `Word: ${wordText.trim()}\n\n`;
-          }
-        }
-
-        // Add definition
-        if (definitionElement) {
-          const definitionText = definitionElement.textContent || definitionElement.innerText || '';
-          if (definitionText.trim()) {
-            textToCopy += `Definition: ${definitionText.trim()}\n\n`;
-          }
-        }
-
-        // Add examples
-        if (exampleElements.length > 0) {
-          textToCopy += 'Examples:\n';
-          exampleElements.forEach((element, index) => {
-            const exampleText = element.textContent || element.innerText || '';
-            if (exampleText.trim()) {
-              // Clean up example text (remove extra whitespace, brackets, etc.)
-              let cleanText = exampleText.trim();
-              cleanText = cleanText.replace(/\[.*?\]/g, ''); // Remove bracketed content
-              cleanText = cleanText.replace(/\s+/g, ' '); // Normalize whitespace
-              cleanText = cleanText.trim();
-
-              if (cleanText) {
-                textToCopy += `${index + 1}. ${cleanText}\n`;
-              }
+          // Add word
+          if (wordElement) {
+            const wordText = wordElement.textContent || wordElement.innerText || '';
+            if (wordText.trim()) {
+              textToCopy += `Word: ${wordText.trim()}\n\n`;
             }
-          });
-        }
+          }
 
-        let success = false;
-        // Copy to clipboard
-        if (textToCopy.trim()) {
-          success = await back_copyToClipboard(textToCopy.trim());
-        }
+          // Add definition
+          if (definitionElement) {
+            const definitionText = definitionElement.textContent || definitionElement.innerText || '';
+            if (definitionText.trim()) {
+              textToCopy += `Definition: ${definitionText.trim()}\n\n`;
+            }
+          }
 
-        if (success) {
-          // Visual feedback
-          const originalHTML = copyButton.innerHTML;
-          copyButton.innerHTML = `
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
-                <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
-              </svg>
-            `;
-          copyButton.style.color = '#4CAF50';
+          // Add examples
+          if (exampleElements.length > 0) {
+            textToCopy += 'Examples:\n';
+            exampleElements.forEach((element, index) => {
+              const exampleText = element.textContent || element.innerText || '';
+              if (exampleText.trim()) {
+                // Clean up example text (remove extra whitespace, brackets, etc.)
+                let cleanText = exampleText.trim();
+                cleanText = cleanText.replace(/\[.*?\]/g, ''); // Remove bracketed content
+                cleanText = cleanText.replace(/\s+/g, ' '); // Normalize whitespace
+                cleanText = cleanText.trim();
 
-          setTimeout(() => {
-            copyButton.innerHTML = originalHTML;
-            copyButton.style.color = '';
-          }, 1500);
-        } else {
+                if (cleanText) {
+                  textToCopy += `${index + 1}. ${cleanText}\n`;
+                }
+              }
+            });
+          }
+
+          // Copy to clipboard
+          if (textToCopy.trim()) {
+            await navigator.clipboard.writeText(textToCopy.trim());
+
+            // Visual feedback
+            const originalHTML = copyButton.innerHTML;
+            copyButton.innerHTML = `
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor">
+                  <path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/>
+                </svg>
+              `;
+            copyButton.style.color = '#4CAF50';
+
+            setTimeout(() => {
+              copyButton.innerHTML = originalHTML;
+              copyButton.style.color = '';
+            }, 1500);
+          }
+        } catch (error) {
           // Visual feedback for error
           const originalHTML = copyButton.innerHTML;
           copyButton.innerHTML = `

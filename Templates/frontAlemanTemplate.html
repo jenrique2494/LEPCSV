@@ -4,7 +4,7 @@
     <h1 class="word">{{Word}}</h1>
     <div class="badges-container">
       <span class="pos-badge {{^Part of Speech}}is-empty{{/Part of Speech}}">
-        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}} 
+        {{#Part of Speech}}{{Part of Speech}}{{/Part of Speech}}
         {{^Part of Speech}}&nbsp;{{/Part of Speech}}
       </span>
       <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
@@ -38,7 +38,7 @@
   </section>
 
   <script>
-    (function() {
+    (function () {
 
       function front_cleanExampleSentenceForCoca(sentenceHTML) {
         if (typeof sentenceHTML !== "string" || !sentenceHTML) return "";
@@ -240,7 +240,7 @@
           });
 
           // Adjective/noun endings (cases)
-          ['','e','en','em','er','es'].forEach(suffix => {
+          ['', 'e', 'en', 'em', 'er', 'es'].forEach(suffix => {
             variations.add(lower + suffix);
             variations.add(capitalized + suffix);
           });
@@ -251,7 +251,7 @@
           variations.add(lower + 'sten');
 
           // Verb conjugation common endings (ich/du/er/wir/ihr/sie)
-          ['e','st','t','en','t','en'].forEach(ending => variations.add(stem + ending));
+          ['e', 'st', 't', 'en', 't', 'en'].forEach(ending => variations.add(stem + ending));
 
           // Past participle and simple past heuristic
           variations.add('ge' + stem + 't');
@@ -264,7 +264,7 @@
           variations.add(lower + 'es');
 
           // Agent / nominalized forms
-          ['er','erin','ung','keit','heit','schaft','tum'].forEach(suf => variations.add(stem + suf));
+          ['er', 'erin', 'ung', 'keit', 'heit', 'schaft', 'tum'].forEach(suf => variations.add(stem + suf));
 
           // Add umlaut variants for reasonable matches
           Array.from(variations).forEach(v => {
@@ -336,41 +336,40 @@
       function front_processLevelBadge() {
         const levelBadge = document.querySelector('.level-badge');
         if (!levelBadge) return;
-        
+
         const tagsContent = levelBadge.textContent || levelBadge.innerText || '';
-        if (!tagsContent) {
+        if (!tagsContent.trim()) {
           levelBadge.style.display = 'none';
           return;
         }
-        
-        // Extract all levels from tags (A1, A2, B1, B2, C1, C2, duplicate)
-        const levels = ['A1', 'A2', 'B1', 'B2', 'C1', 'C2', 'duplicate'];
-        const foundLevels = levels.filter(level => 
-          tagsContent.toLowerCase().includes(level.toLowerCase())
-        );
-        
+
+        // Extract all tags by splitting on whitespace
+        const foundLevels = tagsContent.trim().split(/\s+/).filter(tag => tag.length > 0);
+
         if (foundLevels.length === 0) {
           levelBadge.style.display = 'none';
           return;
         }
-        
+
         // Clear the original badge content
         levelBadge.innerHTML = '';
-        
+
         // Create individual badges for each found level
         foundLevels.forEach((level, index) => {
           const badge = document.createElement('span');
           badge.textContent = level.toUpperCase();
-          badge.className = `level-badge level-${level.toLowerCase()}`;
-          
+          // Use the tag name for the class, replacing special chars if needed for valid CSS class
+          const safeClass = level.toLowerCase().replace(/[^a-z0-9-_]/g, '-');
+          badge.className = `level-badge level-${safeClass}`;
+
           // Add some spacing between badges if there are multiple
           if (index > 0) {
             badge.style.marginLeft = '4px';
           }
-          
+
           levelBadge.appendChild(badge);
         });
-        
+
         // Remove the original level-badge class since we're using it as a container now
         levelBadge.className = 'level-badges-container';
       }

@@ -1,0 +1,158 @@
+/* --- Estilos Globales --- */
+.card {
+    font-family: 'Open Sans', 'Roboto', sans-serif;
+    font-size: 18px;
+    line-height: 1.6;
+    color: #e5e7eb;
+    background-color: #121212; 
+    padding: 20px;
+    margin: 0 auto;
+    max-width: 720px; 
+}
+
+/* --- ESTILOS DEL FRENTE (Centrado) --- */
+.front-container {
+    text-align: center; /* Esto centra todo el frente */
+    margin-bottom: 20px;
+}
+
+.center-context {
+text-align: center;
+}
+.pos-badge {
+    display: inline-block;
+    color: #60a5fa;
+    font-size: 0.85em;
+    font-weight: bold;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0 0 10px 0;
+}
+
+.word-main {
+    font-family: 'Georgia', serif;
+    font-size: 2.5em;
+    font-weight: 700;
+    color: #ffffff;
+    margin: 0 0 10px 0;
+}
+
+.pronunciation {
+    color: #949494;
+    font-size: 1.1em;
+    font-weight: normal;
+    margin: 0 0 20px 0;
+}
+
+.front-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 15px;
+}
+
+.app-icon img {
+    width: 44px;
+    height: 44px;
+}
+
+/* --- LÍNEA DIVISORIA --- */
+.divider {
+    margin: 24px 0;
+    border: none;
+    border-top: 1px solid #374151;
+}
+
+/* --- ESTILOS DEL MARKDOWN Y REVERSO --- */
+.markdown-body {
+    text-align: left; /* Asegura que el reverso siga a la izquierda */
+}
+
+#rendered-translation > p:first-of-type {
+    text-align: center;
+    font-size: 1.3em;
+    font-weight: bold;
+    color: #ffffff;
+    margin-bottom: 30px;
+}
+
+.markdown-body h3 {
+    font-family: 'Montserrat', sans-serif;
+    font-size: 1.2em;
+    color: #60a5fa; 
+    margin-top: 32px;
+    margin-bottom: 16px;
+    border-bottom: 1px solid #374151;
+    padding-bottom: 8px;
+    font-weight: 600;
+}
+
+/* Listas numeradas */
+.markdown-body ol {
+    padding-left: 0;
+    margin-bottom: 24px;
+    list-style-position: outside; /* Mueve el número hacia afuera */
+    margin-left: 24px;
+}
+
+.markdown-body ol li {
+    margin-bottom: 16px;
+    padding-left: 8px;
+}
+
+.markdown-body ol li::marker {
+    color: #fbbf24; 
+    font-weight: bold;
+}
+
+/* ARREGLO DE SALTOS DE LÍNEA: Fuerza al texto a quedarse junto al número */
+.markdown-body li > p {
+    display: inline;
+    margin: 0;
+}
+
+/* Listas con viñetas */
+.markdown-body ul {
+    padding-left: 16px;
+    margin-bottom: 24px;
+    background-color: transparent; 
+    border-left: 3px solid #374151; 
+}
+
+.markdown-body ul li {
+    margin-bottom: 12px;
+    font-style: italic;
+    color: #d1d5db;
+    list-style-type: none;
+    position: relative;
+}
+
+.markdown-body ul li::before {
+    content: '•';
+    color: #60a5fa;
+    position: absolute;
+    left: -16px;
+    font-weight: bold;
+}
+
+.markdown-body strong {
+    color: #ffffff;
+    font-weight: 700;
+}
+
+.markdown-body p {
+    margin-bottom: 16px;
+}
+
+.sub-text {
+    color: #9ca3af;
+    font-size: 0.95em;
+    margin-top: 24px;
+}
+
+@media (max-width: 475px) {
+    .card {
+        padding: 16px;
+    }
+}

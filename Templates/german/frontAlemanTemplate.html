@@ -1,4 +1,5 @@
 <article class="card">
+
   <!-- Card Header: Word Display -->
   <header class="card-header">
     <h1 class="word">{{Word}}</h1>
@@ -9,12 +10,11 @@
       </span>
       <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
     </div>
-    <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Word}}</span>
-    <span class="example-audio">{{tts de_DE:Word}}</span>
-    <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=Apple_Yannick_(Enhanced):Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Word}}</span>
     <button class="copy-word-button" title="Copiar palabra"></button>
-    <button class="copy-card-button" title="Copiar texto de la tarjeta">
-    </button>
+    <button class="copy-card-button" title="Copiar texto completo"></button>
   </header>
 
   <!-- Pronunciation and Audio -->
@@ -22,59 +22,18 @@
     <span class="pronunciation">/{{Pronunciation/IPA}}/</span>
   </section>
 
-  <!-- Grammar Information (if it exists) -->
-  {{#Grammar}}
-  <div class="grammar">{{Grammar}}</div>
-  {{/Grammar}}
-
-  <hr class="divider">
-
-  <!-- Definition Section -->
-  <section class="definition-section">
-    <h2 class="section-title">Definition</h2>
-    <div class="definition-content">{{Definition}}</div>
-  </section>
-
-  <hr class="divider">
+  <hr class="divider" />
 
   <!-- Example Sentences Section -->
   <section class="examples-section">
     <h2 class="section-title">Examples</h2>
     <ul class="examples-list">
       {{#Example 1}}
-      <li class="example-sentence">
-        <span class="example-item">{{Example 1}}</span>
-      </li>
-      <li style="display: flex;">
-        <!--  -->
-        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Example 1}}</span>
-        <span class="example-audio">{{tts de_DE:Example 1}}</span>
-        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Example 1}}</span>
-      </li>
-      {{/Example 1}}
-      {{#Example 2}}
-      <li class="example-sentence">
-        <span class="example-item">{{Example 2}}</span>
-
-      </li>
-      <li style="display: flex;">
-        <!--  -->
-        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Example 2}}</span>
-        <span class="example-audio">{{tts de_DE:Example 2}}</span>
-        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Example 2}}</span>
-      </li>
-      {{/Example 2}}
-      {{#Example 3}}
-      <li class="example-sentence">
-        <span class="example-item">{{Example 3}}</span>
-
-      </li>
-      <li style="display: flex;">
-        <!--  -->
-        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deb-network:Example 3}}</span>
-        <span class="example-audio">{{tts de_DE:Example 3}}</span>
-        <span class="example-audio">{{tts de_DE voices=com.google.android.tts-de-de-x-deg-local:Example 3}}</span>
-      </li>
+      <li class="example-item">{{Example 1}}</li>
+      {{/Example 1}} {{#Example 2}}
+      <li class="example-item">{{Example 2}}</li>
+      {{/Example 2}} {{#Example 3}}
+      <li class="example-item">{{Example 3}}</li>
       {{/Example 3}}
     </ul>
   </section>
@@ -99,7 +58,7 @@
       }
 
       // Function to set up copy word button functionality
-      function back_setupCopyWordButton() {
+      function front_setupCopyWordButton() {
         const copyButton = document.querySelector('.copy-word-button');
         if (!copyButton) return;
         
@@ -153,51 +112,50 @@
       // Function to set up copy card button functionality
       function front_setupCopyCardButton() {
         const copyButton = document.querySelector('.copy-card-button');
-        if (!copyButton) {
-          return;
-        }
-
+        if (!copyButton) return;
+        
         copyButton.addEventListener('click', async (e) => {
           e.preventDefault();
-
+          
           try {
-            // Extract only the relevant text content (word, definition, examples)
             const wordElement = document.querySelector('.word');
             const exampleElements = document.querySelectorAll('.example-item');
-
-            let textToCopy = '';
-
+            
+            let lines = [];
+            
             // Add word
             if (wordElement) {
               const wordText = wordElement.textContent || wordElement.innerText || '';
               if (wordText.trim()) {
-                textToCopy += `Word: ${wordText.trim()}\n\n`;
+                lines.push(`Word: ${wordText.trim()}`);
+                lines.push(''); // Empty line
               }
             }
-
+            
             // Add examples (front template shows examples only)
             if (exampleElements.length > 0) {
-              textToCopy += 'Examples:\n';
+              lines.push('Examples:');
               exampleElements.forEach((element, index) => {
                 const exampleText = element.textContent || element.innerText || '';
                 if (exampleText.trim()) {
-                  // Clean up example text (remove extra whitespace, brackets, etc.)
                   let cleanText = exampleText.trim();
-                  cleanText = cleanText.replace(/\[.*?\]/g, ''); // Remove bracketed content
-                  cleanText = cleanText.replace(/\s+/g, ' '); // Normalize whitespace
+                  cleanText = cleanText.replace(/\[.*?\]/g, '');
+                  cleanText = cleanText.replace(/\s+/g, ' ');
                   cleanText = cleanText.trim();
-
+                  
                   if (cleanText) {
-                    textToCopy += `${index + 1}. ${cleanText}\n`;
+                    lines.push(`${index + 1}. ${cleanText}`);
                   }
                 }
               });
             }
-
-            // Copy to clipboard
+            
+            // Join with line breaks
+            const textToCopy = lines.join('\n');
+            
             if (textToCopy.trim()) {
-              await navigator.clipboard.writeText(textToCopy.trim());
-
+              await navigator.clipboard.writeText(textToCopy);
+              
               // Visual feedback
               const originalHTML = copyButton.innerHTML;
               copyButton.innerHTML = `
@@ -206,13 +164,13 @@
                 </svg>
               `;
               copyButton.style.color = '#4CAF50';
-
+              
               setTimeout(() => {
                 copyButton.innerHTML = originalHTML;
                 copyButton.style.color = '';
               }, 1500);
             }
-
+            
           } catch (error) {
             // Visual feedback for error
             const originalHTML = copyButton.innerHTML;
@@ -222,7 +180,7 @@
               </svg>
             `;
             copyButton.style.color = '#f44336';
-
+            
             setTimeout(() => {
               copyButton.innerHTML = originalHTML;
               copyButton.style.color = '';
@@ -376,7 +334,7 @@
         });
       }
 
-      function back_processLevelBadge() {
+      function front_processLevelBadge() {
         const levelBadge = document.querySelector('.level-badge');
         if (!levelBadge) return;
 
@@ -433,18 +391,22 @@
       }
 
 
+      // ===================================================================
+      // SECCIÓN DE INICIALIZACIÓN
+      // ===================================================================
+
       if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", function () {
-          back_setupCopyWordButton();
+          front_setupCopyWordButton();
           front_setupCopyCardButton();
-          back_processLevelBadge();
+          front_processLevelBadge();
           front_applyCocaExampleCleaning();
           front_highlightWordInExamples();
         });
       } else {
-        back_setupCopyWordButton();
+        front_setupCopyWordButton();
         front_setupCopyCardButton();
-        back_processLevelBadge();
+        front_processLevelBadge();
         front_applyCocaExampleCleaning();
         front_highlightWordInExamples();
       }

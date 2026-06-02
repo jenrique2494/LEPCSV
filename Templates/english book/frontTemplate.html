@@ -1,0 +1,17 @@
+<div class="front-container">
+  {{#Part of Speech}}<h6 class="pos-badge">{{Part of Speech}}</h6>{{/Part of Speech}}
+  
+  <h1 class="word-main">{{Word}}</h1>
+  
+  {{#Transcription}}<h4 class="pronunciation">[{{Transcription}}]</h4>{{/Transcription}}
+  
+  <div class="front-footer">
+    <span class="example-audio">{{tts en_GB voices=com.google.android.tts-en-GB-language:Word}}</span>
+    <span class="example-audio">{{tts en_AU voices=Apple_Lee_(Premium),com.google.android.tts-en-au-x-aud-network:Word}}</span>
+    <span class="example-audio">{{tts en_US voices=Apple_Nathan_(Enhanced),com.google.android.tts-en-us-x-iol-network:Word}}</span>
+    <div class="tags-wrapper">
+      {{#Tags}}{{hint:Tags}}{{/Tags}}
+    </div>
+  </div>
+</div>
+<p class="center-context"> {{Context}}</>

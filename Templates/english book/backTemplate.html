@@ -1,0 +1,50 @@
+{{FrontSide}}
+
+<hr id="answer" class="divider">
+
+<div class="card-content">
+    <div class="hidden-data" id="raw-translation" style="display: none;">{{Translation}}</div>
+    <div class="hidden-data" id="raw-context" style="display: none;">{{Context}}</div>
+    <div class="hidden-data" id="raw-additional" style="display: none;">{{Additional}}</div>
+
+    <div id="rendered-translation" class="markdown-body"></div>
+    <div id="rendered-context" class="markdown-body sub-text"></div>
+    <div id="rendered-additional" class="markdown-body sub-text"></div>
+</div>
+
+<script>
+function renderMarkdown() {
+    const fields = ['translation', 'context', 'additional'];
+    
+    fields.forEach(field => {
+        const rawEl = document.getElementById('raw-' + field);
+        const renderedEl = document.getElementById('rendered-' + field);
+        
+        if (rawEl && renderedEl) {
+            // Limpia <br> y <div> ocultos que Anki genera al hacer "Enter" en el teclado
+            let rawContent = rawEl.innerHTML
+                .replace(/<br\s*\/?>/gi, '\n')
+                .replace(/<\/?div.*?>/gi, '\n')
+                .replace(/&nbsp;/g, ' ');
+
+            // Decodifica entidades HTML para que el Markdown no se rompa
+            const txt = document.createElement("textarea");
+            txt.innerHTML = rawContent;
+            rawContent = txt.value;
+            
+            if (rawContent.trim() !== '') {
+                renderedEl.innerHTML = marked.parse(rawContent);
+            }
+        }
+    });
+}
+
+if (typeof marked === 'undefined') {
+    const script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+    script.onload = renderMarkdown;
+    document.head.appendChild(script);
+} else {
+    renderMarkdown();
+}
+</script>

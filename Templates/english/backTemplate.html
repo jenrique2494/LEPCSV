@@ -282,6 +282,234 @@
       });
     }
 
+    function back_renderDefinitionMarkdown() {
+      const definitionElement = document.querySelector('.definition-content');
+      if (!definitionElement) {
+        console.log('[DefinitionMarkdown] .definition-content not found');
+        return;
+      }
+
+      console.log('[DefinitionMarkdown] .definition-content found', {
+        initialLength: (definitionElement.innerHTML || '').length,
+      });
+
+      function normalizeDefinitionMarkdown(raw) {
+        if (typeof raw !== 'string' || !raw) return '';
+
+        const escapeHtml = (text) => text
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+
+        // Remove any triple-backtick fence lines (```markdown, ```text, or bare ```)
+        // and keep their inner content so it is rendered as normal Markdown.
+        const normalized = raw.replace(/\r\n?/g, '\n');
+        const lines = normalized.split('\n');
+        const output = [];
+
+        lines.forEach((line) => {
+          if (line.trim().startsWith('```')) {
+            return;
+          }
+          output.push(line);
+        });
+
+        // Put quoted example sentences on their own lines with spacing,
+        // and keep non-quoted trailing text separated.
+        const formatted = [];
+        let previousSegmentType = null; // 'quote' | 'text'
+        const quotePartRegex = /"[^"\n]+"/;
+
+        output.forEach((line) => {
+          const currentLine = line || '';
+          if (!currentLine.trim()) {
+            formatted.push('');
+            previousSegmentType = null;
+            return;
+          }
+
+          // Avoid touching HTML tag lines to prevent breaking attributes.
+          if (currentLine.includes('<') && currentLine.includes('>')) {
+            formatted.push(currentLine);
+            previousSegmentType = null;
+            return;
+          }
+
+          // Force break before quote after colon/semicolon when they share line.
+          const preparedLine = currentLine.replace(/([:;])\s*"/g, '$1\n\n"');
+          const physicalLines = preparedLine.split('\n');
+
+          physicalLines.forEach((piece) => {
+            const part = piece.trim();
+            if (!part) {
+              formatted.push('');
+              previousSegmentType = null;
+              return;
+            }
+
+            const parts = part.split(/("[^"\n]+")/g).filter(Boolean);
+            parts.forEach((token) => {
+              const tokenTrimmed = token.trim();
+              if (!tokenTrimmed) return;
+
+              const segmentType = quotePartRegex.test(tokenTrimmed) ? 'quote' : 'text';
+              if (segmentType === 'quote' && previousSegmentType === 'text') {
+                formatted.push('');
+              }
+              if (segmentType === 'text' && previousSegmentType === 'quote') {
+                formatted.push('');
+              }
+
+              formatted.push(tokenTrimmed);
+              if (segmentType === 'quote') {
+                formatted.push('');
+              }
+              previousSegmentType = segmentType;
+            });
+          });
+        });
+
+        const compacted = [];
+        let emptyCount = 0;
+        formatted.forEach((line) => {
+          if (!line.trim()) {
+            emptyCount += 1;
+            if (emptyCount <= 1) compacted.push('');
+          } else {
+            emptyCount = 0;
+            compacted.push(line);
+          }
+        });
+
+        // Extra breathing room and highlighting for non-quoted trailing text after quote blocks.
+        const joined = compacted.join('\n').replace(/\n"\n([^"\n][^\n]*)/g, '\n"\n\n$1').trim();
+        const normalizedLines = joined.split('\n');
+        const enhanced = [];
+        let seenQuotedLine = false;
+
+        normalizedLines.forEach((line) => {
+          const trimmed = line.trim();
+          if (!trimmed) {
+            enhanced.push('');
+            return;
+          }
+
+          const isQuotedLine = /^".*"$/.test(trimmed);
+          if (isQuotedLine) {
+            seenQuotedLine = true;
+            enhanced.push(trimmed);
+            return;
+          }
+
+          const isHtmlLike = trimmed.includes('<') && trimmed.includes('>');
+          if (seenQuotedLine && !isHtmlLike) {
+            enhanced.push('');
+            enhanced.push(`<div class="definition-outside-text">${escapeHtml(trimmed)}</div>`);
+            enhanced.push('');
+            return;
+          }
+
+          enhanced.push(line);
+        });
+
+        const normalizedOutput = enhanced.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+
+        console.log('[DefinitionMarkdown] normalizeDefinitionMarkdown', {
+          inputLength: raw.length,
+          outputLength: normalizedOutput.length,
+        });
+
+        return normalizedOutput;
+      }
+
+      const render = () => {
+        if (typeof marked === 'undefined' || typeof marked.parse !== 'function') {
+          console.log('[DefinitionMarkdown] marked.parse unavailable in render');
+          return;
+        }
+
+        let rawContent = definitionElement.innerHTML
+          .replace(/<br\s*\/?>/gi, '\n')
+          .replace(/<\/?div.*?>/gi, '\n')
+          .replace(/&nbsp;/g, ' ');
+
+        console.log('[DefinitionMarkdown] raw after html cleanup', {
+          length: rawContent.length,
+          preview: rawContent.slice(0, 220),
+        });
+
+        const txt = document.createElement('textarea');
+        txt.innerHTML = rawContent;
+        rawContent = txt.value;
+        rawContent = normalizeDefinitionMarkdown(rawContent);
+
+        console.log('[DefinitionMarkdown] raw before parse', {
+          length: rawContent.length,
+          preview: rawContent.slice(0, 220),
+        });
+
+        if (rawContent.trim() !== '') {
+          definitionElement.innerHTML = marked.parse(rawContent);
+
+          // Keep Definition images on their own line for cleaner reading.
+          definitionElement.querySelectorAll('img').forEach((img) => {
+            img.style.display = 'block';
+            img.style.margin = '12px 0';
+          });
+
+          // Make outside-of-quote trailing text stand out.
+          definitionElement.querySelectorAll('.definition-outside-text').forEach((block) => {
+            block.style.marginTop = '14px';
+            block.style.fontFamily = '"Trebuchet MS", "Segoe UI", sans-serif';
+            block.style.fontWeight = '700';
+            block.style.letterSpacing = '0.2px';
+          });
+
+          console.log('[DefinitionMarkdown] render completed', {
+            resultLength: (definitionElement.innerHTML || '').length,
+            resultPreview: (definitionElement.innerHTML || '').slice(0, 220),
+          });
+        } else {
+          console.log('[DefinitionMarkdown] skipped render because content is empty after normalization');
+        }
+      };
+
+      if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+        console.log('[DefinitionMarkdown] marked already available, rendering now');
+        render();
+        return;
+      }
+
+      const existingLoader = document.querySelector('script[data-marked-loader="true"]');
+      if (existingLoader) {
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+          console.log('[DefinitionMarkdown] existing marked loader already usable');
+          render();
+          return;
+        }
+
+        console.log('[DefinitionMarkdown] removing incompatible existing marked loader');
+        existingLoader.remove();
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://cdn.jsdelivr.net/npm/marked/marked.min.js';
+      script.dataset.markedLoader = 'true';
+      script.onload = () => {
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+          console.log('[DefinitionMarkdown] marked script loaded and available');
+          render();
+        } else {
+          console.log('[DefinitionMarkdown] marked script loaded but parse is still unavailable');
+        }
+      };
+      script.onerror = () => {
+        console.log('[DefinitionMarkdown] failed to load marked script');
+      };
+      document.head.appendChild(script);
+      console.log('[DefinitionMarkdown] marked loader script injected');
+    }
+
     function back_highlightWordInExamples() {
       const wordElement = document.querySelector(".word");
       if (!wordElement) return;
@@ -685,6 +913,7 @@
         back_setupCopyWordButton();
         back_setupCopyCardButton();
         back_processLevelBadge();
+        back_renderDefinitionMarkdown();
         back_applyCocaExampleCleaning();
         back_highlightWordInExamples();
       });
@@ -692,6 +921,7 @@
       back_setupCopyWordButton();
       back_setupCopyCardButton();
       back_processLevelBadge();
+      back_renderDefinitionMarkdown();
       back_applyCocaExampleCleaning();
       back_highlightWordInExamples();
     }

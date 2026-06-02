@@ -12,7 +12,144 @@
     <div id="rendered-additional" class="markdown-body sub-text"></div>
 </div>
 
+<style>
+.center-context em,
+#rendered-translation em,
+#rendered-context em {
+    color: #1d4ed8;
+    font-style: normal;
+    font-weight: 700;
+}
+</style>
+
 <script>
+function back_buildWordVariations(word) {
+    const variations = new Set([word]);
+
+    if (word.endsWith('y') && word.length > 2 && !'aeiou'.includes(word[word.length - 2])) {
+        const stem = word.slice(0, -1);
+        variations.add(stem + 'ies');
+        variations.add(stem + 'ied');
+        variations.add(stem + 'ying');
+    } else if (word.endsWith('s') || word.endsWith('sh') || word.endsWith('ch') || word.endsWith('x') || word.endsWith('z')) {
+        variations.add(word + 'es');
+    } else {
+        variations.add(word + 's');
+    }
+
+    if (word.endsWith('e')) {
+        const stem = word.slice(0, -1);
+        variations.add(word + 'd');
+        variations.add(stem + 'ing');
+        variations.add(stem + 'er');
+        variations.add(stem + 'est');
+        variations.add(stem + 'ly');
+    } else {
+        variations.add(word + 'ed');
+        variations.add(word + 'ing');
+        variations.add(word + 'er');
+        variations.add(word + 'est');
+        variations.add(word + 'ly');
+
+        if (
+            word.length >= 3 &&
+            !'aeiou'.includes(word[word.length - 1]) &&
+            'aeiou'.includes(word[word.length - 2]) &&
+            !'aeiouwxy'.includes(word[word.length - 1])
+        ) {
+            const lastChar = word[word.length - 1];
+            variations.add(word + lastChar + 'ed');
+            variations.add(word + lastChar + 'ing');
+        }
+    }
+
+    ['ness', 'ment', 'tion', 'sion', 'ity', 'able', 'ible', 'ful', 'less', 'ous', 'al', 'ic', 'ive'].forEach((suffix) => {
+        variations.add(word + suffix);
+    });
+
+    ['un', 'in', 'im', 'ir', 'il', 'dis', 'mis', 'non'].forEach((prefix) => {
+        variations.add(prefix + word);
+    });
+
+    const original = Array.from(variations);
+    original.forEach((v) => {
+        variations.add(v.charAt(0).toUpperCase() + v.slice(1));
+        variations.add(v.toUpperCase());
+    });
+
+    return Array.from(variations);
+}
+
+function back_highlightTextNode(node, regex) {
+    const text = node.nodeValue;
+    if (!text || !regex.test(text)) return;
+
+    regex.lastIndex = 0;
+    const fragment = document.createDocumentFragment();
+    let lastIndex = 0;
+    let match;
+
+    while ((match = regex.exec(text)) !== null) {
+        const [matched] = match;
+        const index = match.index;
+
+        if (index > lastIndex) {
+            fragment.appendChild(document.createTextNode(text.slice(lastIndex, index)));
+        }
+
+        const em = document.createElement('em');
+        em.textContent = matched;
+        fragment.appendChild(em);
+
+        lastIndex = index + matched.length;
+    }
+
+    if (lastIndex < text.length) {
+        fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
+    }
+
+    node.parentNode.replaceChild(fragment, node);
+}
+
+function back_highlightWordAndDerivatives() {
+    const wordElement = document.querySelector('.word-main');
+    if (!wordElement) return;
+
+    const cleanWord = (wordElement.textContent || wordElement.innerText || '').trim().toLowerCase();
+    if (!cleanWord) return;
+
+    const variants = back_buildWordVariations(cleanWord)
+        .map((v) => v.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+
+    if (variants.length === 0) return;
+
+    const regex = new RegExp('\\b(' + variants.join('|') + ')\\b', 'gi');
+    const targets = document.querySelectorAll('.center-context, #rendered-translation, #rendered-context, #rendered-additional');
+
+    targets.forEach((target) => {
+        const walker = document.createTreeWalker(target, NodeFilter.SHOW_TEXT, {
+            acceptNode(node) {
+                const parent = node.parentElement;
+                if (!parent) return NodeFilter.FILTER_REJECT;
+                if (parent.closest('script, style, em')) return NodeFilter.FILTER_REJECT;
+                if (!node.nodeValue || !node.nodeValue.trim()) return NodeFilter.FILTER_REJECT;
+                return NodeFilter.FILTER_ACCEPT;
+            },
+        });
+
+        const textNodes = [];
+        let currentNode;
+        while ((currentNode = walker.nextNode())) {
+            textNodes.push(currentNode);
+        }
+
+        textNodes.forEach((node) => {
+            regex.lastIndex = 0;
+            back_highlightTextNode(node, regex);
+        });
+    });
+}
+
 function renderMarkdown() {
     const fields = ['translation', 'context', 'additional'];
     
@@ -37,6 +174,8 @@ function renderMarkdown() {
             }
         }
     });
+
+    back_highlightWordAndDerivatives();
 }
 
 if (typeof marked === 'undefined') {
@@ -48,3 +187,4 @@ if (typeof marked === 'undefined') {
     renderMarkdown();
 }
 </script>
+<script src="https://cdn.jsdelivr.net/npm/marked@18.0.4/bin/marked.js" integrity="sha256-3AFWct3GEyEKb65qsSO5KVpnCk5wRKgXC0HM9Nj1rwY=" crossorigin="anonymous"></script>

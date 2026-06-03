@@ -9,9 +9,9 @@
       </span>
       <span class="level-badge" data-level="{{Tags}}">{{Tags}}</span>
     </div>
-    <span class="example-audio">{{tts de_DE voices=Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Word}}</span>
-    <span class="example-audio">{{tts de_DE voices=Apple_Yannick_(Enhanced):Word}}</span>
-    <span class="example-audio">{{tts de_DE voices=Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Yannick_(Enhanced):Word}}</span>
+    <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Word}}</span>
     <button class="copy-word-button" title="Copiar palabra"></button>
     <button class="copy-card-button" title="Copiar texto de la tarjeta">
     </button>
@@ -47,9 +47,9 @@
       </li>
       <li style="display: flex;">
         <!--  -->
-        <span class="example-audio">{{tts de_DE voices=Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Example 1}}</span>
-        <span class="example-audio">{{tts de_DE voices=Apple_Yannick_(Enhanced):Example 1}}</span>
-        <span class="example-audio">{{tts de_DE voices=Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Example 1}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Example 1}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Yannick_(Enhanced):Example 1}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Example 1}}</span>
       </li>
       {{/Example 1}}
       {{#Example 2}}
@@ -59,9 +59,9 @@
       </li>
       <li style="display: flex;">
         <!--  -->
-        <span class="example-audio">{{tts de_DE voices=Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Example 2}}</span>
-        <span class="example-audio">{{tts de_DE voices=Apple_Yannick_(Enhanced):Example 2}}</span>
-        <span class="example-audio">{{tts de_DE voices=Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Example 2}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Example 2}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Yannick_(Enhanced):Example 2}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Example 2}}</span>
       </li>
       {{/Example 2}}
       {{#Example 3}}
@@ -71,13 +71,33 @@
       </li>
       <li style="display: flex;">
         <!--  -->
-        <span class="example-audio">{{tts de_DE voices=Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Example 3}}</span>
-        <span class="example-audio">{{tts de_DE voices=Apple_Yannick_(Enhanced):Example 3}}</span>
-        <span class="example-audio">{{tts de_DE voices=Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Example 3}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Markus_(Enhanced),com.google.android.tts-de-de-x-deb-network:Example 3}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Yannick_(Enhanced):Example 3}}</span>
+        <span class="example-audio">{{tts de_DE voices=Microsoft_Hedda,Apple_Viktor_(Enhanced),com.google.android.tts-de-de-x-deg-local:Example 3}}</span>
       </li>
       {{/Example 3}}
     </ul>
   </section>
+
+  <style>
+    .definition-content em {
+      color: #1d4ed8;
+      font-style: normal;
+      font-weight: 700;
+    }
+
+    .definition-content .definition-quote-line {
+      display: block;
+      margin: 10px 0;
+    }
+
+    .definition-content .definition-quote-line:last-of-type {
+      margin-bottom: 26px;
+    }
+    .definition-content > p:last-of-type {
+  margin-top: 24px !important;
+}
+  </style>
 
   <script>
     (function () {
@@ -335,7 +355,7 @@
         const partialPattern = "(" + wordVariations.map(v => escapeRegex(v)).join("|") + ")";
         const partialRegex = new RegExp(partialPattern, "gi");
 
-        document.querySelectorAll('.example-item').forEach((item) => {
+        document.querySelectorAll('.example-item, .definition-content').forEach((item) => {
           const originalHTML = item.innerHTML;
 
           // Skip if already contains <em> and try to preserve existing highlights
@@ -451,118 +471,71 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;');
 
-          // Remove any triple-backtick fence lines (```markdown, ```text, or bare ```)
-          // and keep their inner content so it is rendered as normal Markdown.
+          // Keep track of which lines come from inside ``` fenced blocks.
+          // Quote-based formatting is only applied to those fenced lines.
           const normalized = raw.replace(/\r\n?/g, '\n');
           const lines = normalized.split('\n');
-          const output = [];
+          const hasFenceMarkers = lines.some((line) => line.trim().startsWith('```'));
+          const segments = [];
+          // Fallback: if fences are missing by the time Anki renders, treat all lines as fenced.
+          let inFence = !hasFenceMarkers;
 
           lines.forEach((line) => {
             if (line.trim().startsWith('```')) {
+              if (!hasFenceMarkers) {
+                return;
+              }
+              inFence = !inFence;
               return;
             }
-            output.push(line);
+            segments.push({ text: line, inFence });
           });
 
-          // Put quoted example sentences on their own lines with spacing,
-          // and keep non-quoted trailing text separated.
-          const formatted = [];
-          let previousSegmentType = null; // 'quote' | 'text'
-          const quotePartRegex = /"[^"\n]+"/;
+          const processed = [];
+          const quoteRegex = /^"[^"\n]+"$/;
 
-          output.forEach((line) => {
-            const currentLine = line || '';
+          segments.forEach((segment) => {
+            const currentLine = segment.text || '';
+
             if (!currentLine.trim()) {
-              formatted.push('');
-              previousSegmentType = null;
+              processed.push('');
+              return;
+            }
+
+            // Outside fenced blocks, keep original flow unchanged.
+            if (!segment.inFence) {
+              processed.push(currentLine);
               return;
             }
 
             // Avoid touching HTML tag lines to prevent breaking attributes.
             if (currentLine.includes('<') && currentLine.includes('>')) {
-              formatted.push(currentLine);
-              previousSegmentType = null;
+              processed.push(currentLine);
               return;
             }
 
-            // Force break before quote after colon/semicolon when they share line.
-            const preparedLine = currentLine.replace(/([:;])\s*"/g, '$1\n\n"');
-            const physicalLines = preparedLine.split('\n');
+            // Inside fenced blocks, force quoted text into its own line with blank lines around it.
+            // This guarantees visible line breaks after markdown rendering.
+            const lineWithQuoteBreaks = currentLine.replace(/("[^"\n]+")/g, '\n$1\n');
+            const parts = lineWithQuoteBreaks.split('\n').map((part) => part.trim()).filter(Boolean);
 
-            physicalLines.forEach((piece) => {
-              const part = piece.trim();
-              if (!part) {
-                formatted.push('');
-                previousSegmentType = null;
+            parts.forEach((rawToken) => {
+              if (quoteRegex.test(rawToken)) {
+                if (processed.length > 0 && processed[processed.length - 1] !== '') {
+                  processed.push('');
+                }
+                processed.push('<div class="definition-quote-line">' + rawToken + '</div>');
+                processed.push('');
                 return;
               }
 
-              const parts = part.split(/("[^"\n]+")/g).filter(Boolean);
-              parts.forEach((token) => {
-                const tokenTrimmed = token.trim();
-                if (!tokenTrimmed) return;
-
-                const segmentType = quotePartRegex.test(tokenTrimmed) ? 'quote' : 'text';
-                if (segmentType === 'quote' && previousSegmentType === 'text') {
-                  formatted.push('');
-                }
-                if (segmentType === 'text' && previousSegmentType === 'quote') {
-                  formatted.push('');
-                }
-
-                formatted.push(tokenTrimmed);
-                if (segmentType === 'quote') {
-                  formatted.push('');
-                }
-                previousSegmentType = segmentType;
-              });
+              // Prevent markdown ordered-list parsing from swallowing "1." markers.
+              const escapedToken = rawToken.replace(/^(\d+)\.\s/, '$1\\. ');
+              processed.push(escapedToken);
             });
           });
 
-          const compacted = [];
-          let emptyCount = 0;
-          formatted.forEach((line) => {
-            if (!line.trim()) {
-              emptyCount += 1;
-              if (emptyCount <= 1) compacted.push('');
-            } else {
-              emptyCount = 0;
-              compacted.push(line);
-            }
-          });
-
-          // Extra breathing room and highlighting for non-quoted trailing text after quote blocks.
-          const joined = compacted.join('\n').replace(/\n"\n([^"\n][^\n]*)/g, '\n"\n\n$1').trim();
-          const normalizedLines = joined.split('\n');
-          const enhanced = [];
-          let seenQuotedLine = false;
-
-          normalizedLines.forEach((line) => {
-            const trimmed = line.trim();
-            if (!trimmed) {
-              enhanced.push('');
-              return;
-            }
-
-            const isQuotedLine = /^".*"$/.test(trimmed);
-            if (isQuotedLine) {
-              seenQuotedLine = true;
-              enhanced.push(trimmed);
-              return;
-            }
-
-            const isHtmlLike = trimmed.includes('<') && trimmed.includes('>');
-            if (seenQuotedLine && !isHtmlLike) {
-              enhanced.push('');
-              enhanced.push(`<div class="definition-outside-text">${escapeHtml(trimmed)}</div>`);
-              enhanced.push('');
-              return;
-            }
-
-            enhanced.push(line);
-          });
-
-          const normalizedOutput = enhanced.join('\n').replace(/\n{3,}/g, '\n\n').trim();
+          const normalizedOutput = processed.join('\n').replace(/\n{3,}/g, '\n\n').trim();
 
           console.log('[DefinitionMarkdown] normalizeDefinitionMarkdown', {
             inputLength: raw.length,
@@ -599,7 +572,7 @@
           });
 
           if (rawContent.trim() !== '') {
-            definitionElement.innerHTML = marked.parse(rawContent);
+            definitionElement.innerHTML = marked.parse(rawContent, { breaks: true, gfm: true });
 
             // Keep Definition images on their own line for cleaner reading.
             definitionElement.querySelectorAll('img').forEach((img) => {
